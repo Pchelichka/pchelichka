@@ -1,0 +1,3 @@
+[submodule "src/sitl/src"]
+	path = src/sitl/src
+	url = https://github.com/betaflight/betaflight
