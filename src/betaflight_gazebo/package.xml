@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>betaflight_gazebo</name>
+  <version>0.0.0</version>
+  <description>betaflight plugin</description>
+  <maintainer email="kaloyankd.06@gmail.com">Kaloyan Dimitrov</maintainer>
+  <author>Kaloyan Dimitrov</author>
+  <license>Apache 2</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>control_toolbox</depend>
+  <depend>gz-cmake3</depend>
+  <depend>gz-math7</depend>
+  <depend>gz-plugin2</depend>
+  <depend>gz-sim8</depend>
+  <depend>gz-msgs10</depend>
+  <depend>gz-transport13</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+</package>
