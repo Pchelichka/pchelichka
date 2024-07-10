@@ -11,10 +11,10 @@ externalproject_add(betaflight-firmware
   SOURCE_DIR
       ${CMAKE_SOURCE_DIR}/src
   PREFIX
-      ${PROJECT_BINARY_DIR}/betaflight_sim
+  ${PROJECT_BINARY_DIR}/${PROJECT_NAME}
   INSTALL_COMMAND
-    mkdir -p ${CMAKE_INSTALL_PREFIX}/share/betaflight_sim/bin/ &&
-    cp ./obj/main/betaflight_SITL.elf ${CMAKE_INSTALL_PREFIX}/share/betaflight_sim/bin/
+  mkdir -p ${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/bin/ &&
+  cp ./obj/main/betaflight_SITL.elf ${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/bin/
   BUILD_COMMAND pwd && ${MAKE} TARGET=SITL -j
   BUILD_IN_SOURCE ON
   CONFIGURE_COMMAND  ${MAKE} arm_sdk_install
@@ -38,7 +38,7 @@ install(DIRECTORY
   models
   config
   DESTINATION
-    ${CMAKE_INSTALL_PREFIX}/share/betaflight_sim
+  ${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}
 )
 
 ament_package()
