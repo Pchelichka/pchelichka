@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include<iostream>
 #include "betaflight_gazebo/BetaflightPlugin.hpp"
 #include "betaflight_gazebo/Util.hpp"
 
@@ -954,7 +955,7 @@ bool betaflight_gazebo::BetaFlightPlugin::InitSockets(sdf::ElementPtr _sdf) cons
           << ":" << this->dataPtr->fcu_port_out << " aborting plugin.\n";
     return false;
   }
-
+  std::cerr << std::endl << "BetaflightPlugin loaded." << std::endl;
   return true;
 }
 

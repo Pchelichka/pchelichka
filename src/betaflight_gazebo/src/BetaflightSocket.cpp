@@ -122,11 +122,9 @@ ssize_t BetaflightSocket::Recv(void * _buf, const size_t _size, uint32_t _timeou
 
   tv.tv_sec = _timeoutMs / 1000;
   tv.tv_usec = (_timeoutMs % 1000) * 1000UL;
-
   if (select(this->fd + 1, &fds, NULL, NULL, &tv) != 1) {
     return -1;
   }
-
   socklen_t len = sizeof(this->recv);
   return recvfrom(this->fd, _buf, _size, 0, (struct sockaddr *)&this->recv, &len);
 }

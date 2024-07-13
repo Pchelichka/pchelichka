@@ -66,7 +66,7 @@ target_link_libraries(BetaflightPlugin PUBLIC
 
 # Install directories
 install(TARGETS BetaflightPlugin
-  DESTINATION lib
+  DESTINATION share/${PROJECT_NAME}/lib
 )
 
 find_package(ament_cmake REQUIRED)
