@@ -74,7 +74,12 @@
         </visual>
       </link>
     </model>
-
+	<model name="aruco_marker">
+		<include>
+			<uri>model://aruco_marker</uri>
+			<pose>1 0 0.5 0 -1.57 0</pose>
+		</include>
+	</model>
     <model name="iris_with_Betaflight">
         <include>
           <uri>model://iris_with_standoffs</uri>

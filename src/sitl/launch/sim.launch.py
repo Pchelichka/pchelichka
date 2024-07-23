@@ -50,7 +50,9 @@ def generate_launch_description():
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=['/model/iris_with_Betaflight/model/iris_with_standoffs/pose@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
-                   '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
+                   '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+                   '/camera/image_raw@sensor_msgs/msg/Image@gz.msgs.Image',
+                   '/camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo'],
         remappings=[("/model/iris_with_Betaflight/model/iris_with_standoffs/pose", "/tf")],
         output='screen'
     )
@@ -58,7 +60,7 @@ def generate_launch_description():
     run_betaflight_sitl = ExecuteProcess(cmd=['betaflight_SITL.elf', "127.0.0.1"],
                                          cwd=os.path.join(get_betaflight_dir(), "config"),
                                          output='screen')
-    # gazebo = IncludeLaunchDescription(PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')]), launch_arguments=[('gz_args', [' -r -v 4 ', LaunchConfiguration('world_name'), ".sdf"])])
+
     gazebo = ExecuteProcess(
         cmd=['gz', 'sim', '-r', '-v 4', LaunchConfiguration('world_name')], 
         additional_env={
