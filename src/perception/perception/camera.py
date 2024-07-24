@@ -1,24 +1,17 @@
-import rclpy # Python library for ROS 2
-from rclpy.node import Node # Handles the creation of nodes
-from sensor_msgs.msg import Image # Image is the message type
-from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
-import cv2 # OpenCV library
+import rclpy 
+from rclpy.node import Node 
+from sensor_msgs.msg import Image 
+from std_msgs.msg import String
+from cv_bridge import CvBridge 
+import cv2 
+
  
 class ImageSubscriber(Node):
-  """
-  Create an ImageSubscriber class, which is a subclass of the Node class.
-  """
   def __init__(self):
-    """
-    Class constructor to set up the node
-    """
-    # Initiate the Node class's constructor and give it a name
     super().__init__('image_subscriber')
     self.arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_1000)
     self.arucoParams = cv2.aruco.DetectorParameters_create()
-      
-    # Create the subscriber. This subscriber will receive an Image
-    # from the video_frames topic. The queue size is 10 messages.
+    self.publisher = self.create_publisher(String, 'target', 10) 
     self.subscription = self.create_subscription(
       Image, 
       '/camera/image_raw', 
@@ -30,15 +23,12 @@ class ImageSubscriber(Node):
     self.br = CvBridge()
    
   def listener_callback(self, data):
-    """
-    Callback function.
-    """
-    # Display the message on the console
+
     self.get_logger().info('Receiving video frame')
  
     # Convert ROS Image message to OpenCV image
     current_frame = self.br.imgmsg_to_cv2(data)
-    corners, ids, rejected = cv2.aruco.detectMarkers(current_frame, self.arucoDict,
+    corners, _, _ = cv2.aruco.detectMarkers(current_frame, self.arucoDict,
         parameters=self.arucoParams)
     if corners:
         for tag in corners[0]:
@@ -46,8 +36,12 @@ class ImageSubscriber(Node):
             for corner in tag:
                 c = (c[0] + corner[0], c[1] + corner[1])
             c = (int(c[0] / len(tag)), int(c[1] / len(tag)))
+
+            msg = String()
+            msg.data = f'{c[0]},{c[1]}'
+            self.publisher.publish(msg)
             current_frame = cv2.circle(current_frame, c, 5, (255, 0, 0), 2) 
-    # Display image
+    current_frame = cv2.circle(current_frame, (320, 240), 5, (0, 255, 0), 2)
     cv2.imshow("camera", current_frame)
     
     cv2.waitKey(1)

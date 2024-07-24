@@ -6,7 +6,6 @@ from launch.substitutions import LaunchConfiguration
 from launch.event_handlers.on_process_io import OnProcessIO
 from launch_ros.actions import Node
 import os
-import time
 
 
 def get_betaflight_dir():
@@ -74,6 +73,14 @@ def generate_launch_description():
         )},
         output='screen'
     )
+    controller = Node(
+        package='controller',
+        executable='controller'
+    )
+    camera = Node(
+        package='perception',
+        executable='camera'
+    )
     return LaunchDescription([
         world_name_arg,
         use_sim_time_arg,
@@ -82,5 +89,6 @@ def generate_launch_description():
         RegisterEventHandler(OnProcessIO(
             target_action=gazebo,
             on_stderr=lambda event: run_betaflight_sitl if event.text.decode().strip() == 'BetaflightPlugin loaded.' else None # run_betaflight_sitl if event.text.decode().strip() == "" else None
-        ))
+        )),
+        camera
     ])
