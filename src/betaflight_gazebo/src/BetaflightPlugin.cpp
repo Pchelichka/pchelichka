@@ -1089,10 +1089,10 @@ bool betaflight_gazebo::BetaFlightPlugin::ReceiveServoPacket(
     pkt = last_pkt;
     recvSize = recvSize_last;
   }
-  if (counter > 0) {
+  /*if (counter > 0) {
     gzdbg << "[" << this->dataPtr->modelName << "] "
           << "Drained n packets: " << counter << std::endl;
-  }
+  }*/
   if (recvSize == -1) {
     // didn't receive a packet
     // gzdbg << "no packet\n";

@@ -20,7 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'controller = controller.controller:main'
+            'controller = controller.controller:main',
+            'hid = controller.hid:main',
+			'joystick = controller.joystick:main'
         ],
     },
 )

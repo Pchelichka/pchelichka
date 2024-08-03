@@ -14,20 +14,6 @@ def get_betaflight_dir():
 def get_betaflight_gazebo_dir():
     return get_package_share_directory('betaflight_gazebo')
 
-"""
-run_virtual_tty = ExecuteProcess(cmd=["socat", "-dd", "pty,link=/tmp/ttyS0,raw,echo=0", "tcp:127.0.0.1:5761"]),
-
-
-def _run_virtual_tty_check(event):
-    Consider betaflight_controller ready when 'bind port 5761 for UART1...' string is printed.
-
-    Launches betaflight_controller node if ready.
-    target_str = 'bind port 5761 for UART1'
-    if target_str in event.text.decode():
-        time.sleep(2)
-        return run_virtual_tty
-"""
-
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default=True)
 
@@ -61,7 +47,7 @@ def generate_launch_description():
                                          output='screen')
 
     gazebo = ExecuteProcess(
-        cmd=['gz', 'sim', '-r', '-v 4', LaunchConfiguration('world_name')], 
+        cmd=['gz', 'sim', '-s', '-r', '-v 4', LaunchConfiguration('world_name')], 
         additional_env={
         'WAYLAND_DISPLAY': '',
         "GZ_SIM_SYSTEM_PLUGIN_PATH": os.pathsep.join(

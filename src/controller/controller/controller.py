@@ -3,6 +3,7 @@ from rclpy.node import Node
 import time
 from .tx import Tx
 from simple_pid import PID
+from threading import Timer
 
 from std_msgs.msg import String
 
@@ -35,11 +36,10 @@ class Controller(Node):
             y = float(parsed[1])
             roll = 1500 - round(self.roll_pid(x))
             throttle = 1750 + round(self.throttle_pid(y))
-            print(roll)
-            self.tx.update(roll = roll, throttle=throttle)
 
-
-
+            t = Timer(0.6, lambda: self.tx.update(roll = roll, throttle=throttle))
+            t.start()
+            
 def main(args=None):
     rclpy.init(args=args)
 

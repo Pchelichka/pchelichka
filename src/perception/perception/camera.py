@@ -23,9 +23,6 @@ class ImageSubscriber(Node):
     self.br = CvBridge()
    
   def listener_callback(self, data):
-
-    self.get_logger().info('Receiving video frame')
- 
     # Convert ROS Image message to OpenCV image
     current_frame = self.br.imgmsg_to_cv2(data)
     corners, _, _ = cv2.aruco.detectMarkers(current_frame, self.arucoDict,
