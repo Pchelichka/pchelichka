@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'controller = controller.controller:main',
+            'pid_controller = controller.pid_controller:main',
             'hid = controller.hid:main',
 			'joystick = controller.joystick:main'
         ],

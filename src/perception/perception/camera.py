@@ -37,7 +37,8 @@ class ImageSubscriber(Node):
             msg = String()
             msg.data = f'{c[0]},{c[1]}'
             self.publisher.publish(msg)
-            current_frame = cv2.circle(current_frame, c, 5, (255, 0, 0), 2) 
+            current_frame = cv2.circle(current_frame, c, 5, (255, 0, 0), 2)  
+
     current_frame = cv2.circle(current_frame, (320, 240), 5, (0, 255, 0), 2)
     cv2.imshow("camera", current_frame)
     

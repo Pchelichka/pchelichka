@@ -1,6 +1,6 @@
 import pygame
 import serial
-import time
+
 def main():
     dev = serial.Serial(port='/dev/ttyACM0', baudrate=115200)
     pygame.init()

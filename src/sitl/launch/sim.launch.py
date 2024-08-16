@@ -41,6 +41,10 @@ def generate_launch_description():
         remappings=[("/model/iris_with_Betaflight/model/iris_with_standoffs/pose", "/tf")],
         output='screen'
     )
+    foxglove_bridge = Node(
+        package='foxglove_bridge',
+        executable='foxglove_bridge'
+    )
 
     run_betaflight_sitl = ExecuteProcess(cmd=['betaflight_SITL.elf', "127.0.0.1"],
                                          cwd=os.path.join(get_betaflight_dir(), "config"),
@@ -71,6 +75,7 @@ def generate_launch_description():
         world_name_arg,
         use_sim_time_arg,
         gz_bridge,
+        foxglove_bridge,
         gazebo,
         RegisterEventHandler(OnProcessIO(
             target_action=gazebo,

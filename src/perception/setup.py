@@ -9,7 +9,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name, ['package.xml', 'resource/' + 'calibration.npz']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'camera = perception.camera:main'
+            'camera = perception.camera:main',
+            'camera_analog = perception.camera_analog:main'
         ],
     },
 )
