@@ -1,0 +1,5 @@
+# Battery voltage retrieval service
+
+---
+bool success
+float64 voltage

@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import math
 import rclpy 
@@ -44,12 +45,9 @@ class Camera(Node):
     self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_1000)
     self.aruco_params = cv2.aruco.DetectorParameters_create()
     self.publisher = self.create_publisher(Float64MultiArray, 'target', 10) 
-    # self.x_publisher = self.create_publisher(String, 'target/x', 10) 
-    # self.y_publisher = self.create_publisher(String, 'target/y', 10) 
-    # self.z_publisher = self.create_publisher(String, 'target/z', 10) 
-    # self.theta_publisher = self.cree_publisher(String, 'target/theta', 10) 
     self.timer = self.create_timer(1 / 30, self.callback)
     self.vid = cv2.VideoCapture(4) 
+    # self.vid = cv2.VideoCapture(0)
     self.aruco_side_length = 0.05 # meters
     self.marker_points = [
         [-self.aruco_side_length / 2, self.aruco_side_length / 2, 0],
@@ -86,7 +84,7 @@ class Camera(Node):
         x, y, z = tvec[0][0]
         theta = rotationMatrixToEulerAngles(R)[1]
         msg = Float64MultiArray()
-        msg.data = [x * 100, y, z, theta]
+        msg.data = [x * 100, y * 100, z * 100, theta, time.time()]
         # print(cv2.rot2euler(rvec))
         self.publisher.publish(msg)
 
