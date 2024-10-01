@@ -16,6 +16,8 @@ class PIDController(Node):
     def __init__(self):
         super().__init__('controller')
         self.armed = False
+        self.pollinated = False
+        self.landing = False
         self.effort_publisher = self.create_publisher(Float64MultiArray, 'effort', 10) 
         self.velocity_publisher = self.create_publisher(Float64MultiArray, 'velocity', 10) 
         self.velocity_target_publisher = self.create_publisher(Float64MultiArray, 'velocity_target', 10) 
@@ -25,22 +27,22 @@ class PIDController(Node):
         # self.roll_vel_pid = PID(350, 0, 0, setpoint=0) # 270, 40, 40
         self.roll_pid = CascadePID(3, 0, 
                                    1, 0, 0,   # pos
-                                   1.5, 0.6, 0, # vel 
-                                   48, 1, 0)   # acc
+                                   1.5, 1.2, 0, # vel 
+                                   45, 3, 0)   # acc
         # self.pitch_pid = PID(1, 0, 0, setpoint=0.5) # 120, 4, 50 # 500, 40, 50
         # self.pitch_vel_pid = PID(350, 0, 0, setpoint=0) # 270, 40, 40
-        self.pitch_pid = CascadePID(3, 0.5, 
+        self.pitch_pid = CascadePID(3, 0.75, 
                                    1, 0, 0,   # pos 
-                                    1.5, 0.6, 0, # vel
-                                    48, 1, 0)   # acc
+                                    1.5, 1.2, 0, # vel
+                                    45, 3, 0)   # acc
         self.yaw_pid = PID(80, 0, 10, setpoint=0)
         # self.throttle_pid = PID(1, 0, 0, setpoint=0) #22, 1.2, 40; 30, 18, 11.25
         # self.throttle_vel_pid = PID(10, 0, 0, setpoint=0) #22, 1.2, 40; 30, 18, 11.25
         self.throttle_pid = CascadePID(3, 0, 
                                        1.5, 0.2, 0,  # pos
-                                       3.5, 1.75, 0, # vel # 1.2 
+                                       4, 8, 0, # vel # 1.2 
                                        20, 10, 0)  # acc # 1.8
-        self.throttle_ff = 1417
+        self.throttle_ff = 1395
         self.roll_ff = 1500
         self.pitch_ff = 1500
         self.pitch = 0
@@ -120,12 +122,20 @@ class PIDController(Node):
             # z = -0.35367012 * self.prev_z + 0.67683506 * raw_z + 0.67683506 * self.prev_unfiltered_z
             theta = -0.35367012 * self.prev_theta + 0.67683506 * raw_theta + 0.67683506 * self.prev_unfiltered_theta
         if self.armed and self.prev_t:
-            self.yaw_pid.set_auto_mode(True)
-            self.throttle_pid.set_auto_mode(True)
-            self.throttle_ff = 1390
-            self.roll_pid.set_auto_mode(True)
+            # self.yaw_pid.set_auto_mode(True)
+            if time.time() - self.armed_time > 0.3 and not self.landing:
+                if not self.throttle_pid.auto_mode:
+                    self.throttle_pid.set_auto_mode(True)
+                    self.throttle_ff = 1390
+            elif self.landing:
+                self.throttle_pid.set_auto_mode(False)
+                self.throttle_ff = 1300
+            else: 
+                self.throttle_pid.set_auto_mode(False)
+                self.throttle_ff = 1420
+            # self.roll_pid.set_auto_mode(True)
             # self.roll_vel_pid.set_auto_mode(True)
-            self.pitch_pid.set_auto_mode(True)
+            # self.pitch_pid.set_auto_mode(True)
             # self.pitch_vel_pid.set_auto_mode(True)
             # self.throttle_vel_pid.set_auto_mode(True)
             self.roll_ff = 1500 #1580
@@ -150,6 +160,7 @@ class PIDController(Node):
             acc_target_msg.data = []
             if self.throttle_pid.auto_mode and self.y.filtering:
                 outputs = self.throttle_pid(self.y.value, self.y.first_derivative_value, self.y.second_derivative_value)
+                print(outputs)
                 velocity_msg.data.append(self.y.first_derivative_value)
                 velocity_target_msg.data.append(outputs[0])
                 acc_msg.data.append(self.y.second_derivative_value)
@@ -160,6 +171,15 @@ class PIDController(Node):
 
             if self.pitch_pid.auto_mode and self.z.filtering:
                 outputs = self.pitch_pid(self.z.value, self.z.first_derivative_value, self.z.second_derivative_value)
+                if self.pitch_pid.setpoint > 0.2 and abs(self.x.value) < 0.1 and abs(self.y.value) < 0.3 and abs(self.pitch_pid.setpoint - self.z.value) < 0.1:
+                    self.pitch_pid.setpoint -= 0.0002 
+                if self.z.value <= 0.25:
+                    self.pollinated = True
+                if self.pollinated:
+                    self.pitch_pid.setpoint += 0.02
+                    if self.z.value >= 0.5:
+                        self.pollinated = False
+                        self.landing = True
                 velocity_msg.data.append(self.z.first_derivative_value)
                 velocity_target_msg.data.append(outputs[0])
                 acc_msg.data.append(self.z.second_derivative_value)

@@ -300,4 +300,4 @@ class CascadePID():
     def set_auto_mode(self, enabled, last_output=None):
         """Enable or disable the PID controller, optionally setting the last output value."""
 
-        self._auto_mode = enabled
+        self.auto_mode = enabled
