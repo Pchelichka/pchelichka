@@ -22,7 +22,8 @@ objp = np.zeros((CHESSBOARD_CORNERS_ROWCOUNT*CHESSBOARD_CORNERS_COLCOUNT,3), np.
 # The following line fills the tuples just generated with their values (0, 0, 0), (1, 0, 0), ...
 objp[:,:2] = np.mgrid[0:CHESSBOARD_CORNERS_ROWCOUNT,0:CHESSBOARD_CORNERS_COLCOUNT].T.reshape(-1, 2)
 
-vid = cv2.VideoCapture(4) 
+# vid = cv2.VideoCapture(4) 
+vid = cv2.VideoCapture('fdsrc ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 imageSize = None
 time.sleep(2)
 start_time = time.time()
@@ -84,4 +85,5 @@ calibration, cameraMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(
 # Print matrix and distortion coefficient to the console
 print(cameraMatrix)
 print(distCoeffs)
-np.savez(os.path.join(os.path.dirname(__file__), '../resource/calibration.npz'), mtx=cameraMatrix, dist=distCoeffs)
+# np.savez(os.path.join(os.path.dirname(__file__), '../resource/calibration.npz'), mtx=cameraMatrix, dist=distCoeffs)
+np.savez(os.path.join(os.path.dirname(__file__), '../resource/calibration_dji.npz'), mtx=cameraMatrix, dist=distCoeffs)

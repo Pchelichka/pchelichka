@@ -26,7 +26,8 @@ setup(
             'controller = controller.controller:main',
             'absolute_controller = controller.absolute_controller:main',
             'hid = controller.hid:main',
-			'joystick = controller.joystick:main'
+			'joystick = controller.joystick:main',
+			'elrs_test = controller.elrs_test:main'
         ],
     },
 )
