@@ -22,9 +22,20 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+add_executable(elrs_node
+  src/elrs_node.cpp
+  src/util.cpp
+  src/main.cpp
+)
 
-add_executable(elrs_node src/main.cpp)
-ament_target_dependencies(elrs_node rclcpp std_msgs)
+target_include_directories(elrs_node PUBLIC
+  include
+)
+
+ament_target_dependencies(elrs_node
+  rclcpp
+  std_msgs
+)
 
 install(TARGETS
   elrs_node
