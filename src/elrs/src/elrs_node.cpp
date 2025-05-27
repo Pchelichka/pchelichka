@@ -3,12 +3,12 @@
 // set default values to rcChannels
 void ELRSNode::SetDefaultRcChannels() {
 	for (uint8_t i = 0; i < CRSF_MAX_CHANNEL; i++) {
-		rcChannels[i] = RC_MID;
+		rcChannels_[i] = RC_MID;
 	}
-	rcChannels[THROTTLE] = RC_MIN;
-	rcChannels[AUX1] = RC_MIN;
-	rcChannels[AUX2] = RC_MIN;
-	rcChannels[AUX3] = RC_MAX;
+	rcChannels_[THROTTLE] = RC_MIN;
+	rcChannels_[AUX1] = RC_MIN;
+	rcChannels_[AUX2] = RC_MIN;
+	rcChannels_[AUX3] = RC_MAX;
 }
 
 // Periodically communicates over serial with the ELRS module 
@@ -20,9 +20,17 @@ void ELRSNode::SerialLoop() {
 	// 	setDefaultRcChannels();
 	// }
 
-	CrsfPrepareChannelsPacket(crsfPacket, rcChannels);
+	CrsfPrepareChannelsPacket(crsfPacket_, rcChannels_);
 	// RCLCPP_INFO(this->get_logger(), "Writing to serial...");
-	write(fd, crsfPacket, CRSF_PACKET_SIZE);           
+	write(fd, crsfPacket_, CRSF_PACKET_SIZE);           
+	int numBytes = read(fd, readBuf_, sizeof(readBuf_));
+	// RCLCPP_INFO(this->get_logger(), "Read %d bytes from serial", numBytes);
+
+	if (numBytes > 0) {
+		for (int i = 0; i < numBytes; ++i) {
+			ProcessCrsfByte(readBuf_[i]);
+		}
+	}
 }
 
 void ELRSNode::RcChannelsCallback(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
@@ -32,7 +40,7 @@ void ELRSNode::RcChannelsCallback(const std_msgs::msg::Int32MultiArray::SharedPt
 	}
 
 	for (size_t i = 0; i < CRSF_MAX_CHANNEL; ++i) {
-		rcChannels[i] = msg->data[i];
+		rcChannels_[i] = msg->data[i];
 	}
 }
 

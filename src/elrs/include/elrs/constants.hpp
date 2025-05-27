@@ -4,9 +4,25 @@
 #include <chrono>  // time
 #include <termios.h> // POSIX terminal control definitionss
 
-constexpr uint8_t RADIO_ADDRESS = 0xEA;
-constexpr uint8_t ADDR_MODULE = 0xEE;  //  Crossfire transmitter
-constexpr uint8_t TYPE_CHANNELS = 0x16;
+constexpr uint8_t CRSF_RADIO_ADDRESS = 0xEA;
+constexpr uint8_t CRSF_SYNC_BYTE = 0xC8;
+constexpr uint8_t CRSF_ADDR_MODULE = 0xEE;  //  Crossfire transmitter
+
+// crsf packet type
+constexpr uint8_t CRSF_PACKET_TYPE_GPS = 0x02;
+constexpr uint8_t CRSF_PACKET_TYPE_VARIO = 0x07;
+constexpr uint8_t CRSF_PACKET_TYPE_BATTERY_SENSOR = 0x08;
+constexpr uint8_t CRSF_PACKET_TYPE_BARO_ALT = 0x09;
+constexpr uint8_t CRSF_PACKET_TYPE_HEARTBEAT = 0x0B;
+constexpr uint8_t CRSF_PACKET_TYPE_VIDEO_TRANSMITTER = 0x0F;
+constexpr uint8_t CRSF_PACKET_TYPE_LINK_STATISTICS = 0x14;
+constexpr uint8_t CRSF_PACKET_TYPE_RC_CHANNELS_PACKED = 0x16;
+constexpr uint8_t CRSF_PACKET_TYPE_ATTITUDE = 0x1E;
+constexpr uint8_t CRSF_PACKET_TYPE_FLIGHT_MODE = 0x21;
+constexpr uint8_t CRSF_PACKET_TYPE_DEVICE_INFO = 0x29;
+constexpr uint8_t CRSF_PACKET_TYPE_CONFIG_READ = 0x2C;
+constexpr uint8_t CRSF_PACKET_TYPE_CONFIG_WRITE = 0x2D;
+constexpr uint8_t CRSF_PACKET_TYPE_RADIO_ID = 0x3A;
 
 // internal crsf variables
 constexpr int RC_MIN = 988;

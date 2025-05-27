@@ -18,11 +18,13 @@ private:
 	std::chrono::steady_clock::time_point last_rc_update_;
 	// timer to periodically send channels to ELRS module
 	rclcpp::TimerBase::SharedPtr loop_timer_;
-	int rcChannels[CRSF_MAX_CHANNEL];
+	int rcChannels_[CRSF_MAX_CHANNEL];
 	// ros2 subscriber to receive rc channels from controls
 	rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr channels_sub_;
 	// current packet to send
-	uint8_t crsfPacket[CRSF_PACKET_SIZE];
+	uint8_t crsfPacket_[CRSF_PACKET_SIZE];
+	// telemetry read buffer TODO: check size
+	uint8_t readBuf_[64];
 
 	void SetDefaultRcChannels();
 

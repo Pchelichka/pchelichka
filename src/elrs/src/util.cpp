@@ -1,5 +1,77 @@
 #include "elrs/util.hpp"
 
+
+void ProcessCrsfByte(uint8_t byte) {
+	static CrsfParserState parserState = WAIT_HEADER;
+	static uint8_t crsfBuffer[CRSF_PACKET_SIZE];
+	static uint8_t crsfIndex = 0;
+	static uint8_t crsfPayloadLength = 0;
+	switch (parserState) {
+		case WAIT_HEADER:
+			if (byte == CRSF_SYNC_BYTE || byte == CRSF_RADIO_ADDRESS) {
+				crsfBuffer[0] = byte;
+				printf("Header: 0x%02X\n", byte);
+				crsfIndex = 1;
+				parserState = WAIT_LENGTH;
+			}
+			break;
+
+		case WAIT_LENGTH:
+			crsfPayloadLength = byte;
+			printf("Length: 0x%02X\n", byte);
+			crsfBuffer[crsfIndex++] = byte;
+			parserState = WAIT_TYPE;
+			break;
+
+		case WAIT_TYPE:
+			crsfBuffer[crsfIndex++] = byte;
+			printf("Type: 0x%02X\n", byte);
+			parserState = WAIT_PAYLOAD;
+			break;
+
+		case WAIT_PAYLOAD:
+			crsfBuffer[crsfIndex++] = byte;
+			if (crsfIndex >= crsfPayloadLength + 2) {
+				if (CheckCrc(crsfBuffer, crsfIndex)) {
+					ParseCrsfPacket(crsfBuffer, crsfIndex);
+				} else {
+					printf("Invalid CRC: computed != 0x%02X\n", crsfBuffer[crsfIndex - 1]);
+				}
+				parserState = WAIT_HEADER;
+			}
+			break;
+	}
+}
+
+void ParseCrsfPacket(uint8_t* buffer, size_t length) {
+	uint8_t type = buffer[2];
+	const uint8_t* payload = &buffer[3];
+
+	switch (type) {
+		case CRSF_PACKET_TYPE_LINK_STATISTICS:
+			// RSSI (dBm) = -RSSI + 0
+			printf("Telemetry: RSSI=%d LQ=%d", payload[0], payload[2]);
+			break;
+
+		case CRSF_PACKET_TYPE_BATTERY_SENSOR:
+		{
+			uint16_t voltage_mv = payload[0] | (payload[1] << 8);
+			uint16_t current_ma = payload[2] | (payload[3] << 8);
+			
+			printf("Battery: %u mV, %u mA", voltage_mv, current_ma);
+			break;
+		}
+		default:
+			// RCLCPP_INFO(this->get_logger(), "Received packet type 0x%02X", type);
+			break;
+	}
+}
+bool CheckCrc(uint8_t* buffer, size_t length) {
+	uint8_t crc = CrsfCrc8(&buffer[2], length - 3); // exclude addr, len, crc
+	printf("Calculated: 0x%02X -- Actual 0x%02X\n", crc, buffer[length - 1]);
+	return crc == buffer[length - 1];
+}
+
 // Map RC range (RC_MIN-RC_MAX) to the values accepted by CRSF(CRSF_MIN-CRSF_MAX)
 int MapRcToCrsf(int rc_value) {
 	// Clamp input to expected RC range
@@ -30,9 +102,9 @@ void CrsfPrepareChannelsPacket(uint8_t packet[], int rcChannels[]){
 		channels[i] = MapRcToCrsf(rcChannels[i]);
 	}   
 	// packet[0] = UART_SYNC; //Header
-	packet[0] = ADDR_MODULE; //Header
+	packet[0] = CRSF_ADDR_MODULE; //Header
 	packet[1] = 24;   // length of type (24) + payload + crc
-	packet[2] = TYPE_CHANNELS;
+	packet[2] = CRSF_PACKET_TYPE_RC_CHANNELS_PACKED;
 	
 	packet[3] = (uint8_t) (channels[0] & 0x07FF);
 	packet[4] = (uint8_t) ((channels[0] & 0x07FF)>>8 | (channels[1] & 0x07FF)<<3);
