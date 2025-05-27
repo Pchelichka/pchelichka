@@ -17,7 +17,7 @@ externalproject_add(betaflight-firmware
   cp ./obj/main/betaflight_SITL.elf ${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/bin/
   BUILD_COMMAND pwd && ${MAKE} TARGET=SITL -j
   BUILD_IN_SOURCE ON
-  CONFIGURE_COMMAND  ${MAKE} arm_sdk_install
+  CONFIGURE_COMMAND CONFIGURE_COMMAND ${CMAKE_COMMAND} -E echo "Skipping armsdk_install"
 )
 
 ament_environment_hooks(cmake/setup.sh.in)
