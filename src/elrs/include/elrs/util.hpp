@@ -1,17 +1,11 @@
+#include "rclcpp/rclcpp.hpp"
 #include <fstream>
 #include <fcntl.h>
 #include <dirent.h>
 #include <algorithm>
+#include <string.h> // memcpy
 
 #include "constants.hpp"
-
-enum CrsfParserState {
-	WAIT_HEADER,
-	WAIT_LENGTH,
-	WAIT_TYPE,
-	WAIT_PAYLOAD,
-	WAIT_CRC
-};
 
 std::string FindSerialPortByVidPid(const std::string& vid, const std::string& pid);
 int MapRcToCrsf(int rc_value);

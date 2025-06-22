@@ -52,6 +52,8 @@ constexpr int CRSF_PACKET_SIZE  = 26;
 constexpr int CRSF_FRAME_LENGTH = 24;   // length of type + payload + = crc;
 constexpr int CRSF_CHANNEL_BITS = 11;
 
+constexpr int CRSF_FRAME_LENGTH_ADDRESS = 1;
+constexpr int CRSF_FRAME_TYPE_ADDRESS = 2;
 // named channels of radio
 enum chan_order{
    ROLL,
