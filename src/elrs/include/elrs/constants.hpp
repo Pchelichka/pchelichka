@@ -4,7 +4,9 @@
 #include <chrono>  // time
 #include <termios.h> // POSIX terminal control definitionss
 
-constexpr uint8_t CRSF_RADIO_ADDRESS = 0xEA;
+#define NODE_LOGGER rclcpp::get_logger("elrs_node")
+
+constexpr uint8_t CRSF_ADDR_RADIO = 0xEA;
 constexpr uint8_t CRSF_SYNC_BYTE = 0xC8;
 constexpr uint8_t CRSF_ADDR_MODULE = 0xEE;  //  Crossfire transmitter
 
@@ -74,7 +76,7 @@ enum chan_order{
    AUX12,  // (CH12) // telemetry?
 };
 
-// crc implementation from CRSF protocol document rev7
+// crc implementation from CRSF protocol document rev7(CRC-8/DVB-S2)
 constexpr uint8_t crsf_crc8tab[256] = {
 0x00, 0xD5, 0x7F, 0xAA, 0xFE, 0x2B, 0x81, 0x54, 0x29, 0xFC, 0x56, 0x83, 0xD7, 0x02, 0xA8, 0x7D,
 0x52, 0x87, 0x2D, 0xF8, 0xAC, 0x79, 0xD3, 0x06, 0x7B, 0xAE, 0x04, 0xD1, 0x85, 0x50, 0xFA, 0x2F,

@@ -1,0 +1,44 @@
+{
+	"name": "ROS 2 Development Container",
+	"privileged": true,
+	"remoteUser": "pchelichka",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"workspaceFolder": "/home/ws",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/home/ws,type=bind",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools",
+				"ms-vscode.cpptools-extension-pack",
+				"ms-python.vscode-pylance",
+				"ms-python.python",
+				"donjayamanne.python-extension-pack",
+				"ms-azuretools.vscode-containers",
+				"jaehyunshim.vscode-ros2",
+				"esbenp.prettier-vscode",
+				"vscodevim.vim",
+				"ms-iot.vscode-ros"
+			]
+		}
+	},
+	"containerEnv": {
+		"DISPLAY": "unix:0",
+		"GZ_VERSION": "harmonic",
+		"ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST"
+	},
+	"runArgs": [
+		"--net=host",
+		"--pid=host",
+		"--ipc=host",
+		"-e",
+		"DISPLAY=${env:DISPLAY}"
+	],
+	"mounts": [
+		"source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+		"source=/dev/dri,target=/dev/dri,type=bind,consistency=cached",
+		"source=/dev/bus/usb,target=/dev/bus/usb,type=bind"
+	],
+	"postCreateCommand": "sudo chown -R $(whoami) /home/ws/"
+}

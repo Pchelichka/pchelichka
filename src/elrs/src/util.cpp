@@ -1,66 +1,71 @@
 #include "elrs/util.hpp"
 
-
+// handle each incoming byte from the ELRS module
 void ProcessCrsfByte(uint8_t byte) {
 	static uint8_t crsf_frame_buffer[CRSF_FRAME_SIZE_MAX * 2];
 	static uint8_t crsf_frame_buffer_pos  = 0;
-	static uint8_t crsfPayloadLength = 0;
-	static uint8_t crsfType = 0;
 	// record incoming byte in buffer
 	crsf_frame_buffer[crsf_frame_buffer_pos++] = byte;
 	if (crsf_frame_buffer_pos > 3) {
 		uint8_t expected_frame_len = crsf_frame_buffer[CRSF_FRAME_LENGTH_ADDRESS];
 		uint8_t expected_frame_type = crsf_frame_buffer[CRSF_FRAME_TYPE_ADDRESS];
-		// printf("Type: 0x%02X\n", expected_frame_type);
 		int full_frame_length = expected_frame_len + 2;
 		if (expected_frame_type == CRSF_PACKET_TYPE_RADIO_ID) {
 			full_frame_length = expected_frame_len + 5;
 		}
 		if (full_frame_length > CRSF_FRAME_SIZE_MAX) {
-			printf("Frame error: size if too large = %d\n", full_frame_length);
+			RCLCPP_WARN(NODE_LOGGER, "Frame error: size if too large = %d", full_frame_length);
+			crsf_frame_buffer_pos = 0;
 			return;
 		} else if (crsf_frame_buffer_pos >= full_frame_length) {
-			ParseCrsfPacket(crsf_frame_buffer, crsf_frame_buffer_pos);
-			crsf_frame_buffer_pos -= full_frame_length; // subtract frame size from write pointer
-			memcpy(crsf_frame_buffer, &crsf_frame_buffer[full_frame_length], crsf_frame_buffer_pos); // put the remaining bytes into beginning	
+			if (ParseCrsfPacket(crsf_frame_buffer, crsf_frame_buffer_pos)) {
+				crsf_frame_buffer_pos -= full_frame_length; // subtract frame size from write pointer
+				memcpy(crsf_frame_buffer, &crsf_frame_buffer[full_frame_length], crsf_frame_buffer_pos); // put the remaining bytes into beginning	
+			} else {
+				crsf_frame_buffer_pos = 0;
+			}
 		}
 	}
 }
 
-void ParseCrsfPacket(uint8_t* buffer, size_t buffer_length) {
-	const uint8_t length = buffer[1];
+// parse a full CRSF packet to extract its data
+bool ParseCrsfPacket(uint8_t* buffer, size_t buffer_length) {
 	const uint8_t type = buffer[2];
 	const uint8_t* payload = &buffer[3];
-	const uint8_t expected_crc = buffer[length + 1];
-	if (CrsfCrc8(&buffer[2], length - 1)) {
+	if (CheckCrc(buffer, buffer_length)) {
 		switch (type) {
 			case CRSF_PACKET_TYPE_LINK_STATISTICS:
-				RCLCPP_INFO(rclcpp::get_logger("elrs_node"), "Telemetry: RSSI=%d LQ=%d\n", payload[0], payload[2]);
-				break;
-
-			case CRSF_PACKET_TYPE_BATTERY_SENSOR:
 			{
-				uint16_t voltage_mv = payload[0] | (payload[1] << 8);
-				uint16_t current_ma = payload[2] | (payload[3] << 8);
-				
-				RCLCPP_INFO(rclcpp::get_logger("elrs_node"), "Battery: %u mV, %u mA", voltage_mv, current_ma);
+				int8_t rssi1 = payload[0] >= 128 ? payload[0] - 256 : payload[0];
+				int8_t rssi2 = payload[1] >= 128 ? payload[1] - 256 : payload[1];
+				uint8_t lq = payload[2];
+				uint8_t mode = payload[5];
+				RCLCPP_INFO(NODE_LOGGER, "Telemetry: RSSI=%d/%d LQ=%d:%d", rssi1, rssi2, mode, lq);
 				break;
 			}
 			case CRSF_PACKET_TYPE_ATTITUDE:
-				RCLCPP_INFO(rclcpp::get_logger("elrs_node"), "%d", length);
+			{
+				float pitch = ((int16_t)((payload[0] << 8) | payload[1])) / 10000.0f;
+				float roll  = ((int16_t)((payload[2] << 8) | payload[3])) / 10000.0f;
+				float yaw   = ((int16_t)((payload[4] << 8) | payload[5])) / 10000.0f;
+
+        		RCLCPP_INFO(NODE_LOGGER, "Attitude: Roll=%.2f rad, Pitch=%.2f rad, Yaw=%.2f rad", roll, pitch, yaw);
 				break;
+			}
 			default:
-				RCLCPP_INFO(rclcpp::get_logger("elrs_node"), "Received packet type 0x%02X", type);
+				RCLCPP_INFO(NODE_LOGGER, "Received packet type 0x%02X", type);
 				break;
 		}
+		return true;
 	} else {
-		printf("CRC error\n");
+		RCLCPP_WARN(NODE_LOGGER, "CRC error, packet type: 0x%02X", type);
+		return false;
 	}
 }
 
+// verify crc of packet
 bool CheckCrc(uint8_t* buffer, size_t length) {
 	uint8_t crc = CrsfCrc8(&buffer[2], length - 3); // exclude addr, len, crc
-	printf("Calculated: 0x%02X -- Actual 0x%02X\n", crc, buffer[length - 1]);
 	return crc == buffer[length - 1];
 }
 

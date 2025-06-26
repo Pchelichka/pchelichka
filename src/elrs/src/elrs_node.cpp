@@ -19,12 +19,10 @@ void ELRSNode::SerialLoop() {
 	// 	RCLCPP_WARN(this->get_logger(), "Failsafe activated - no new RC data received");
 	// 	setDefaultRcChannels();
 	// }
-
 	CrsfPrepareChannelsPacket(crsfPacket_, rcChannels_);
-	// RCLCPP_INFO(this->get_logger(), "Writing to serial...");
 	write(fd, crsfPacket_, CRSF_PACKET_SIZE);           
+
 	int numBytes = read(fd, readBuf_, sizeof(readBuf_));
-	// RCLCPP_INFO(this->get_logger(), "Read %d bytes from serial", numBytes);
 
 	if (numBytes > 0) {
 		for (int i = 0; i < numBytes; ++i) {
@@ -72,7 +70,7 @@ ELRSNode::ELRSNode() : Node("elrs_node") {
 	tty.c_lflag = 0;                // no signaling chars, no echo, no canonical processing
 	tty.c_oflag = 0;                // no remapping, no delays
 	tty.c_cc[VMIN]  = 0;            // read doesn't block
-	tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+	tty.c_cc[VTIME] = 0;            // no read timeout
 
 	tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
 	tty.c_cflag |= (CLOCAL | CREAD);    // ignore modem controls, enable reading
