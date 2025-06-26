@@ -1,0 +1,5 @@
+---
+bool success
+float64 pitch_radians
+float64 roll_radians
+float64 yaw_radians

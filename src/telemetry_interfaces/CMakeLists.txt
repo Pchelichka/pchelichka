@@ -27,6 +27,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetBatteryVoltage.srv"
+  "srv/GetAttitude.srv"
   "srv/GetPitch.srv"
   "srv/GetRoll.srv"
   "srv/GetYaw.srv"

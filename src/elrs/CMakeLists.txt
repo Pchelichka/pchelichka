@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(telemetry_interfaces REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -35,6 +36,7 @@ target_include_directories(elrs_node PUBLIC
 ament_target_dependencies(elrs_node
   rclcpp
   std_msgs
+  telemetry_interfaces
 )
 
 install(TARGETS
