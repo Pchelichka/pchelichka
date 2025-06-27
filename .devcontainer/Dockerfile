@@ -10,14 +10,14 @@ RUN if id -u $USER_UID ; then userdel `id -un $USER_UID` ; fi
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
 	&& usermod -aG dialout $USERNAME \
-    #
-    # [Optional] Add sudo support. Omit if you don't need to install software after connecting.
+	&& usermod -aG plugdev $USERNAME \
+# software install
     && apt-get update \
     && apt-get install -y sudo \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get install -y python3-pip
+RUN apt-get install -y python3-pip libusb-1.0-0 libusb-1.0-0-dev usbutils
 ENV SHELL /bin/bash
 
 # ********************************************************

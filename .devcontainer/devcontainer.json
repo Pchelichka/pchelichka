@@ -33,7 +33,9 @@
 		"--pid=host",
 		"--ipc=host",
 		"-e",
-		"DISPLAY=${env:DISPLAY}"
+		"DISPLAY=${env:DISPLAY}",
+		"--device=/dev/bus/usb", // OR more specific like /dev/bus/usb/001/004
+		"--privileged"
 	],
 	"mounts": [
 		"source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
