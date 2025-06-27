@@ -43,8 +43,6 @@ def rotationMatrixToEulerAngles(R) :
 class Camera(Node):
   def __init__(self):
     super().__init__('image_subscriber')
-    print('Version')
-    print(cv2.__version__)
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['analog', 'digital'], required=True,
                         help='Choose the input type: analog (OpenCV webcam) or digital (custom C++ stream)')
@@ -58,9 +56,16 @@ class Camera(Node):
         self.WIDTH = 640
         self.HEIGHT = 480
     elif args.mode == 'digital':
+		# stdin instead of named pipe
         # self.vid = cv2.VideoCapture('fdsrc ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
-        self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
+		# test h264 pipeline
+        # self.vid = cv2.VideoCapture('videotestsrc ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
+		# most optimal(broken) pipeline
+        # self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
+		# current working pipeline(generic decoder)
+        self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! decodebin ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
         # slow pipeline
+        # self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
         # self.vid = cv2.VideoCapture('fdsrc ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 
         self.vid.set(cv2.CAP_PROP_BUFFERSIZE, 1)
