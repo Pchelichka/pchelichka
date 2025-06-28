@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import numpy as np
 import math
@@ -41,12 +42,8 @@ def rotationMatrixToEulerAngles(R) :
     return np.array([x, y, z])
  
 class Camera(Node):
-  def __init__(self):
+  def __init__(self, args):
     super().__init__('image_subscriber')
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', choices=['analog', 'digital'], required=True,
-                        help='Choose the input type: analog (OpenCV webcam) or digital (custom C++ stream)')
-    args = parser.parse_args()
     self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
     self.aruco_params = cv2.aruco.DetectorParameters()
     self.publisher = self.create_publisher(Float64MultiArray, 'target', 10) 
@@ -56,13 +53,13 @@ class Camera(Node):
         self.WIDTH = 640
         self.HEIGHT = 480
     elif args.mode == 'digital':
-		# stdin instead of named pipe
+        # stdin instead of named pipe
         # self.vid = cv2.VideoCapture('fdsrc ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
-		# test h264 pipeline
+        # test h264 pipeline
         # self.vid = cv2.VideoCapture('videotestsrc ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
-		# most optimal(broken) pipeline
+        # most optimal(broken) pipeline
         # self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
-		# current working pipeline(generic decoder)
+        # current working pipeline(generic decoder)
         self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! decodebin ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
         # slow pipeline
         # self.vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
@@ -118,13 +115,21 @@ class Camera(Node):
     
     cv2.waitKey(1)
   
-def main(args=None):
-  
+def main(args=None): 
+  if '--ros-args' in sys.argv:
+    idx = sys.argv.index('--ros-args')
+    user_args = sys.argv[1:idx]
+  else:
+    user_args = sys.argv[1:]
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--mode', choices=['analog', 'digital'], required=True,
+                        help='Choose the input type: analog (OpenCV webcam) or digital (custom C++ stream)')
+  parsed_args = parser.parse_args(user_args) 
   # Initialize the rclpy library
   rclpy.init(args=args)
   
   # Create the node
-  image_subscriber = Camera()
+  image_subscriber = Camera(parsed_args)
   
   # Spin the node so the callback function is called.
   rclpy.spin(image_subscriber)

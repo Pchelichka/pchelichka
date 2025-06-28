@@ -1,20 +1,29 @@
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
-from ament_index_python.packages import get_package_share_directory
-import os
+from launch_ros.actions import Node
+from launch.actions import RegisterEventHandler, EmitEvent
+from launch.event_handlers import OnProcessStart
+from launch.events import matches_action
 
 def generate_launch_description():
-    # Full path to the script inside the share directory
-    script_path = os.path.join(
-        get_package_share_directory('perception'),
-        'scripts',
-        'dji_stream'  # Your executable script
+    dji_node = Node(
+        package='dji',
+        executable='dji',
+    )
+
+    camera_node = Node(
+        package='perception',
+        executable='camera',
+		arguments=['--mode', 'digital']
+    )
+
+    launch_camera_node = RegisterEventHandler(
+        OnProcessStart(
+            target_action=dji_node,
+            on_start=[camera_node]
+        )
     )
 
     return LaunchDescription([
-        ExecuteProcess(
-            cmd=[f'{script_path} | ros2 run perception camera -- --mode digital'],
-            shell=True,
-            output='screen'
-        )
+        dji_node,
+        launch_camera_node
     ])
