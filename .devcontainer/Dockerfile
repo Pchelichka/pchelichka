@@ -33,7 +33,8 @@ RUN sudo apt-get update && sudo apt-get install -y \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
-	python3-pip libusb-1.0-0 libusb-1.0-0-dev usbutils 
+	python3-serial python3-scipy \
+	libusb-1.0-0 libusb-1.0-0-dev usbutils 
 
 # Clone OpenCV and contrib (version 4.11.0)
 WORKDIR /tmp

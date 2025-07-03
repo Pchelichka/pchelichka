@@ -47,6 +47,7 @@ bool ELRSNode::ParseCrsfPacket(uint8_t* buffer, size_t buffer_length) {
 		switch (type) {
 			case CRSF_PACKET_TYPE_LINK_STATISTICS:
 			{
+				drone_connected_ = true;
 				int8_t rssi1 = payload[0] >= 128 ? payload[0] - 256 : payload[0];
 				int8_t rssi2 = payload[1] >= 128 ? payload[1] - 256 : payload[1];
 				uint8_t lq = payload[2];
@@ -55,6 +56,7 @@ bool ELRSNode::ParseCrsfPacket(uint8_t* buffer, size_t buffer_length) {
 				break;
 			}
 			case CRSF_PACKET_TYPE_ATTITUDE:
+				drone_connected_ = true;
 				current_pitch_ = ((int16_t)((payload[0] << 8) | payload[1])) / 10000.0f;
 				current_roll_  = ((int16_t)((payload[2] << 8) | payload[3])) / 10000.0f;
 				current_yaw_   = ((int16_t)((payload[4] << 8) | payload[5])) / 10000.0f;

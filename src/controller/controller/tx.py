@@ -10,6 +10,16 @@ class Mode(Enum):
     PPM = auto()
     ELRS = auto()
 
+    def __str__(self):
+        return self.name.lower()
+
+    @classmethod
+    def from_string(cls, s):
+        try:
+            return cls[s.upper()]
+        except KeyError:
+            raise ValueError(f"Invalid mode: {s}. Valid options: {', '.join(m.name.lower() for m in cls)}")
+
 class Tx:
     def __init__(self, mode=Mode.SIM, publisher=None):
         self.mode = mode

@@ -1,21 +1,25 @@
+import sys
 import rclpy
 from rclpy.node import Node
 import time
-from .tx import Tx
+from .tx import Tx, Mode
 from .pid import PID, CascadePID
 from .savgol_filtered_data import SavgolFilteredData
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Int32MultiArray
 import math
-from telemetry_interfaces.srv import GetPitch, GetRoll, GetYaw, GetBatteryVoltage
+import argparse
+from telemetry_interfaces.srv import GetAttitude, GetPitch, GetRoll, GetYaw, GetBatteryVoltage
 
 def clip(value: int, lower: int, upper: int):
     return lower if value < lower else upper if value > upper else value
 
 class PIDController(Node):
 
-    def __init__(self):
+    def __init__(self, tx_mode = Mode.ELRS):
         super().__init__('controller')
-        self.armed = False
+        self.tx_mode = tx_mode
+        self.vision = False
+        self._armed = False
         self.pollinated = False
         self.landing = False
         self.effort_publisher = self.create_publisher(Float64MultiArray, 'effort', 10) 
@@ -55,17 +59,14 @@ class PIDController(Node):
         self.prev_theta = None
         self.prev_unfiltered_theta = None
         self.prev_t = None
+        self.attitude_client = self.create_client(GetAttitude, '/get_attitude')
         self.pitch_client = self.create_client(GetPitch, '/get_pitch')
         self.roll_client = self.create_client(GetRoll, '/get_roll')
         self.yaw_client = self.create_client(GetYaw, '/get_yaw')
         self.battery_voltage_client = self.create_client(GetBatteryVoltage, '/get_battery_voltage')
 
-        while not self.pitch_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Pitch service not available, waiting again...')
-        while not self.roll_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Roll service not available, waiting again...')
-        while not self.yaw_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Yaw service not available, waiting again...')
+        while not self.attitude_client.wait_for_service(timeout_sec=1.0) and not (self.pitch_client.wait_for_service(timeout_sec=1.0) and self.roll_client.wait_for_service(timeout_sec=1.0) and self.yaw_client.wait_for_service(timeout_sec=1.0)):
+            self.get_logger().info('Attitude service(s) not available, waiting...')
         while not self.battery_voltage_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Battery voltage service not available, waiting again...')
         self.timer_action = self.create_timer(0.01, self.call_telemetry_services)
@@ -74,21 +75,42 @@ class PIDController(Node):
             'target',
             self.listener_callback,
             10)
-        self.tx = Tx(False)
+        
+        self.tx = Tx(mode=Mode.ELRS, publisher=self.create_publisher(Int32MultiArray, 'rc_channels', 10))
+        # Wait for tx initialization
         time.sleep(1)
-        self.tx.arm()
-        time.sleep(5)
-        self.armed = True
-        self.armed_time = time.time()
+        # arm on launch if not waiting for service
+        if self.tx_mode == Mode.PPM or self.tx_mode == Mode.SIM: 
+            time.sleep(1)
+            self.tx.arm()
+            time.sleep(5)
+            self.armed = True
+
+    @property
+    def armed(self):
+        return self._armed
+
+    @armed.setter
+    def armed(self, value):
+        self._armed = value
+        if value:
+            self.armed_time = time.time()
+
     def call_telemetry_services(self):
-        pitch_future = self.pitch_client.call_async(GetPitch.Request())
-        roll_future = self.roll_client.call_async(GetRoll.Request())
-        yaw_future = self.yaw_client.call_async(GetYaw.Request())
         battery_voltage_future = self.battery_voltage_client.call_async(GetBatteryVoltage.Request())
-        pitch_future.add_done_callback(self.pitch_callback)
-        roll_future.add_done_callback(self.roll_callback)
-        yaw_future.add_done_callback(self.yaw_callback)
         battery_voltage_future.add_done_callback(self.battery_voltage_callback)
+        if self.attitude_client.service_is_ready():
+            att_future = self.attitude_client.call_async(GetAttitude.Request())
+            att_future.add_done_callback(self.attitude_callback)
+            pass
+        else:
+            pitch_future = self.pitch_client.call_async(GetPitch.Request())
+            roll_future = self.roll_client.call_async(GetRoll.Request())
+            yaw_future = self.yaw_client.call_async(GetYaw.Request())
+            pitch_future.add_done_callback(self.pitch_callback)
+            roll_future.add_done_callback(self.roll_callback)
+            yaw_future.add_done_callback(self.yaw_callback)
+
     def pitch_callback(self, future):
         if future.result().success:
             self.pitch = future.result().radians
@@ -98,12 +120,28 @@ class PIDController(Node):
     def yaw_callback(self, future):
         if future.result().success:
             self.yaw = future.result().radians
+
+    def yaw_callback(self, future):
+        if future.result().success:
+            self.yaw = future.result().radians
+
+    def attitude_callback(self, future):
+        if future.result().success:
+            self.pitch = future.result().pitch_radians
+            self.roll = future.result().roll_radians
+            self.yaw = future.result().yaw_radians
+            if not self.armed:
+                self.get_logger().info('Arming...')
+                self.tx.arm()
+                self.armed = True
+    
     
     def battery_voltage_callback(self, future):
         if future.result().success:
             self.battery_voltage = future.result().voltage
 
     def listener_callback(self, msg: Float64MultiArray):
+        self.vision = True
         raw_x, raw_y, raw_z, raw_theta, t = msg.data
         raw_x /= 100
         self.x.add(raw_x)
@@ -130,6 +168,7 @@ class PIDController(Node):
             elif self.landing:
                 self.throttle_pid.set_auto_mode(False)
                 self.throttle_ff = 1300
+            # take-off
             else: 
                 self.throttle_pid.set_auto_mode(False)
                 self.throttle_ff = 1420
@@ -215,21 +254,34 @@ class PIDController(Node):
         self.prev_t = t
 
     def exit_gracefully(self):
-        print('Exiting...')
-        self.tx.land()
+        self.get_logger().info('Exiting...')
         self.tx.exit_gracefully()
             
 def main(args=None):
-    rclpy.init(args=args)
-
-    controller = PIDController()
-
-    rclpy.spin(controller)
-
-    PIDController.exit_gracefully()
-    controller.destroy_node()
-    rclpy.shutdown()
-
+    # deal with --ros-args
+    if '--ros-args' in sys.argv:
+        idx = sys.argv.index('--ros-args')
+        user_args = sys.argv[1:idx]
+    else:
+        user_args = sys.argv[1:]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', type=Mode.from_string, choices=list(Mode), required=True,
+                        help='Choose the tx type: sim for gazebo simulation, ppm for a microcontroller interface(e.g. arduino) or elrs for direct serial control of an elrs module')
+    parsed_args = parser.parse_args(user_args) 
+    rclpy.init(args=args, signal_handler_options=rclpy.signals.SignalHandlerOptions.NO)
+    controller = None
+    try:
+        controller = PIDController(parsed_args.mode)
+        while rclpy.ok():
+            rclpy.spin_once(controller, timeout_sec=0.01)
+    except KeyboardInterrupt:
+        controller.get_logger().fatal('Emergency stop')
+        if controller is not None:
+            controller.exit_gracefully()
+    finally:
+        if controller is not None:
+            controller.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
