@@ -8,17 +8,31 @@ from .savgol_filtered_data import SavgolFilteredData
 from std_msgs.msg import Float64MultiArray, Int32MultiArray
 import math
 import argparse
+import signal
 from telemetry_interfaces.srv import GetAttitude, GetPitch, GetRoll, GetYaw, GetBatteryVoltage
+
+def sig_handler(_signo, _stack_frame_):
+    sys.exit(0)
 
 def clip(value: int, lower: int, upper: int):
     return lower if value < lower else upper if value > upper else value
+
+def channel_value(value: float):
+    return clip(round(value), 1000, 2000)
+
+THROTTLE_FF = 1550
+THROTTLE_LANDING_FF = 1500
+PITCH_FF = 1500
+ROLL_FF = 1500
+YAW_FF = 1500
+TAKEOFF_DELAY_SECS = 3
+CONTROL_DELAY_SECS = 0.2
 
 class PIDController(Node):
 
     def __init__(self, tx_mode = Mode.ELRS):
         super().__init__('controller')
         self.tx_mode = tx_mode
-        self.vision = False
         self._armed = False
         self.pollinated = False
         self.landing = False
@@ -27,28 +41,23 @@ class PIDController(Node):
         self.velocity_target_publisher = self.create_publisher(Float64MultiArray, 'velocity_target', 10) 
         self.acc_publisher = self.create_publisher(Float64MultiArray, 'acc', 10) 
         self.acc_target_publisher = self.create_publisher(Float64MultiArray, 'acc_target', 10) 
-        # self.roll_pid = PID(1, 0, 0, setpoint=0) # 270, 40, 40
-        # self.roll_vel_pid = PID(350, 0, 0, setpoint=0) # 270, 40, 40
         self.roll_pid = CascadePID(3, 0, 
                                    1, 0, 0,   # pos
                                    1.5, 1.2, 0, # vel 
-                                   45, 3, 0)   # acc
-        # self.pitch_pid = PID(1, 0, 0, setpoint=0.5) # 120, 4, 50 # 500, 40, 50
-        # self.pitch_vel_pid = PID(350, 0, 0, setpoint=0) # 270, 40, 40
-        self.pitch_pid = CascadePID(3, 0.75, 
+                                   25, 0, 0)   # acc
+        self.pitch_pid = CascadePID(3, 0.8, 
                                    1, 0, 0,   # pos 
                                     1.5, 1.2, 0, # vel
-                                    45, 3, 0)   # acc
-        self.yaw_pid = PID(80, 0, 10, setpoint=0)
-        # self.throttle_pid = PID(1, 0, 0, setpoint=0) #22, 1.2, 40; 30, 18, 11.25
-        # self.throttle_vel_pid = PID(10, 0, 0, setpoint=0) #22, 1.2, 40; 30, 18, 11.25
+                                    25, 0, 0)   # acc
+        self.yaw_pid = PID(40, 0, 2, setpoint=0)
         self.throttle_pid = CascadePID(3, 0, 
                                        1.5, 0.2, 0,  # pos
-                                       4, 8, 0, # vel # 1.2 
-                                       20, 10, 0)  # acc # 1.8
-        self.throttle_ff = 1395
-        self.roll_ff = 1500
-        self.pitch_ff = 1500
+                                       4, 0, 0, # vel 
+                                       14, 28, 0)  # acc 
+        self.throttle_ff = THROTTLE_FF
+        self.roll_ff = ROLL_FF
+        self.pitch_ff = PITCH_FF
+        self.yaw_ff = YAW_FF
         self.pitch = 0
         self.roll = 0
         self.yaw = 0
@@ -65,6 +74,7 @@ class PIDController(Node):
         self.yaw_client = self.create_client(GetYaw, '/get_yaw')
         self.battery_voltage_client = self.create_client(GetBatteryVoltage, '/get_battery_voltage')
 
+        self.get_logger().info('Checking services...') 
         while not self.attitude_client.wait_for_service(timeout_sec=1.0) and not (self.pitch_client.wait_for_service(timeout_sec=1.0) and self.roll_client.wait_for_service(timeout_sec=1.0) and self.yaw_client.wait_for_service(timeout_sec=1.0)):
             self.get_logger().info('Attitude service(s) not available, waiting...')
         while not self.battery_voltage_client.wait_for_service(timeout_sec=1.0):
@@ -75,8 +85,7 @@ class PIDController(Node):
             'target',
             self.listener_callback,
             10)
-        
-        self.tx = Tx(mode=Mode.ELRS, publisher=self.create_publisher(Int32MultiArray, 'rc_channels', 10))
+        self.tx = Tx(mode=self.tx_mode, publisher=self.create_publisher(Int32MultiArray, 'rc_channels', 10) if self.tx_mode == Mode.ELRS else None)
         # Wait for tx initialization
         time.sleep(1)
         # arm on launch if not waiting for service
@@ -85,6 +94,7 @@ class PIDController(Node):
             self.tx.arm()
             time.sleep(5)
             self.armed = True
+        self.get_logger().info('Initialization complete.') 
 
     @property
     def armed(self):
@@ -97,13 +107,13 @@ class PIDController(Node):
             self.armed_time = time.time()
 
     def call_telemetry_services(self):
-        battery_voltage_future = self.battery_voltage_client.call_async(GetBatteryVoltage.Request())
-        battery_voltage_future.add_done_callback(self.battery_voltage_callback)
+        if self.battery_voltage_client.service_is_ready():
+            battery_voltage_future = self.battery_voltage_client.call_async(GetBatteryVoltage.Request())
+            battery_voltage_future.add_done_callback(self.battery_voltage_callback)
         if self.attitude_client.service_is_ready():
             att_future = self.attitude_client.call_async(GetAttitude.Request())
             att_future.add_done_callback(self.attitude_callback)
-            pass
-        else:
+        elif self.pitch_client.service_is_ready() and self.roll_client.service_is_ready() and self.yaw_client.service_is_ready(): # use individual axis services
             pitch_future = self.pitch_client.call_async(GetPitch.Request())
             roll_future = self.roll_client.call_async(GetRoll.Request())
             yaw_future = self.yaw_client.call_async(GetYaw.Request())
@@ -130,7 +140,8 @@ class PIDController(Node):
             self.pitch = future.result().pitch_radians
             self.roll = future.result().roll_radians
             self.yaw = future.result().yaw_radians
-            if not self.armed:
+            # arm as soon as service indicates readiness
+            if not self.armed and self.prev_t:
                 self.get_logger().info('Arming...')
                 self.tx.arm()
                 self.armed = True
@@ -139,56 +150,45 @@ class PIDController(Node):
     def battery_voltage_callback(self, future):
         if future.result().success:
             self.battery_voltage = future.result().voltage
+    
+    def flight_duration_secs(self):
+        return max(0, time.time() - self.armed_time - TAKEOFF_DELAY_SECS)
 
     def listener_callback(self, msg: Float64MultiArray):
-        self.vision = True
         raw_x, raw_y, raw_z, raw_theta, t = msg.data
+        # scale to meters and add to filters
         raw_x /= 100
         self.x.add(raw_x)
-        # x = raw_x
         raw_y /= 100
         self.y.add(raw_y)
-        # y = raw_y
         raw_z /= 100
         self.z.add(raw_z)
-        # z = raw_z
         theta = raw_theta
         if self.prev_t:
             # low-pass filtering
-            # x = -0.35367012 * self.prev_x + 0.67683506 * raw_x + 0.67683506 * self.prev_unfiltered_x
-            # y = -0.35367012 * self.prev_y + 0.67683506 * raw_y + 0.67683506 * self.prev_unfiltered_y
-            # z = -0.35367012 * self.prev_z + 0.67683506 * raw_z + 0.67683506 * self.prev_unfiltered_z
             theta = -0.35367012 * self.prev_theta + 0.67683506 * raw_theta + 0.67683506 * self.prev_unfiltered_theta
-        if self.armed and self.prev_t:
-            # self.yaw_pid.set_auto_mode(True)
-            if time.time() - self.armed_time > 0.3 and not self.landing:
-                if not self.throttle_pid.auto_mode:
-                    self.throttle_pid.set_auto_mode(True)
-                    self.throttle_ff = 1390
-            elif self.landing:
+        # delay take-off by TAKEOFF_DELAY_SECS seconds after arming
+        if self.armed and self.prev_t and time.time() - self.armed_time > TAKEOFF_DELAY_SECS:
+            self.roll_pid.set_auto_mode(True)
+            self.yaw_pid.set_auto_mode(False)
+            if not self.landing:
+                self.throttle_pid.set_auto_mode(True)
+                self.throttle_ff = THROTTLE_FF
+            else:
                 self.throttle_pid.set_auto_mode(False)
-                self.throttle_ff = 1300
-            # take-off
-            else: 
-                self.throttle_pid.set_auto_mode(False)
-                self.throttle_ff = 1420
-            # self.roll_pid.set_auto_mode(True)
-            # self.roll_vel_pid.set_auto_mode(True)
-            # self.pitch_pid.set_auto_mode(True)
-            # self.pitch_vel_pid.set_auto_mode(True)
-            # self.throttle_vel_pid.set_auto_mode(True)
-            self.roll_ff = 1500 #1580
-            self.pitch_ff = 1500 # 1530
-            # else:
-            #     self.roll_pid.set_auto_mode(False)
-            #     self.roll_vel_pid.set_auto_mode(False)
-            #     self.pitch_pid.set_auto_mode(False)
-            #     self.pitch_vel_pid.set_auto_mode(False)
-            #     self.throttle_pid.set_auto_mode(False)
-            #     self.throttle_vel_pid.set_auto_mode(False)
-            #     self.throttle_ff = 1400
-            #     self.roll_ff = 1500
-            #     self.pitch_ff = 1500
+                self.throttle_ff = THROTTLE_LANDING_FF
+            # enable full pid control after takeoff
+            if self.flight_duration_secs() > CONTROL_DELAY_SECS:
+                self.roll_ff = ROLL_FF
+                self.roll_pid.set_auto_mode(True)
+                self.pitch_ff = PITCH_FF
+                self.pitch_pid.set_auto_mode(True)
+            else:
+                # disable roll and pitch adjustments for takeoff but keep yaw active
+                self.roll_pid.set_auto_mode(False)
+                self.pitch_pid.set_auto_mode(False)
+
+           # logging msg initialization 
             velocity_msg = Float64MultiArray()
             velocity_msg.data = []
             velocity_target_msg = Float64MultiArray()
@@ -197,50 +197,46 @@ class PIDController(Node):
             acc_msg.data = []
             acc_target_msg = Float64MultiArray()
             acc_target_msg.data = []
+            # control
             if self.throttle_pid.auto_mode and self.y.filtering:
                 outputs = self.throttle_pid(self.y.value, self.y.first_derivative_value, self.y.second_derivative_value)
-                print(outputs)
                 velocity_msg.data.append(self.y.first_derivative_value)
                 velocity_target_msg.data.append(outputs[0])
                 acc_msg.data.append(self.y.second_derivative_value)
                 acc_target_msg.data.append(outputs[1])
-                throttle = clip(round((self.throttle_ff + outputs[-1]) / (math.cos(self.pitch) * math.cos(self.roll))), 1000, 2000)#(math.cos(self.pitch) * math.cos(self.roll))
+                throttle = channel_value((self.throttle_ff + outputs[-1]) / (math.cos(self.pitch) * math.cos(self.roll)))
             else:
-                throttle = self.throttle_ff
+                throttle = channel_value(self.throttle_ff)
 
             if self.pitch_pid.auto_mode and self.z.filtering:
-                outputs = self.pitch_pid(self.z.value, self.z.first_derivative_value, self.z.second_derivative_value)
-                if self.pitch_pid.setpoint > 0.2 and abs(self.x.value) < 0.1 and abs(self.y.value) < 0.3 and abs(self.pitch_pid.setpoint - self.z.value) < 0.1:
-                    self.pitch_pid.setpoint -= 0.0002 
-                if self.z.value <= 0.25:
-                    self.pollinated = True
-                if self.pollinated:
-                    self.pitch_pid.setpoint += 0.02
-                    if self.z.value >= 0.5:
-                        self.pollinated = False
-                        self.landing = True
+                outputs = self.pitch_pid(self.z.value, self.z.first_derivative_value, self.z.second_derivative_value) 
+                if time.time() - self.armed_time >= 10:
+                    self.landing = True
                 velocity_msg.data.append(self.z.first_derivative_value)
                 velocity_target_msg.data.append(outputs[0])
                 acc_msg.data.append(self.z.second_derivative_value)
                 acc_target_msg.data.append(outputs[1])
-                pitch = clip(round((self.pitch_ff - outputs[-1])), 1000, 2000)
+                pitch = channel_value(self.pitch_ff - outputs[-1] / (throttle / THROTTLE_FF))
             else:
-                pitch = self.pitch_ff
+                pitch = channel_value(self.pitch_ff)
+
             if self.roll_pid.auto_mode and self.x.filtering:
                 outputs = self.roll_pid(self.x.value, self.x.first_derivative_value, self.x.second_derivative_value)
                 velocity_msg.data.append(self.x.first_derivative_value)
                 velocity_target_msg.data.append(outputs[0])
                 acc_msg.data.append(self.x.second_derivative_value)
                 acc_target_msg.data.append(outputs[1])
-                roll = clip(round((self.roll_ff - outputs[-1])), 1000, 2000)
+                roll = channel_value(self.roll_ff - outputs[-1] / (throttle / THROTTLE_FF))
             else:
-                roll = self.roll_ff
+                roll = channel_value(self.roll_ff)
 
             # inverse yaw
             if self.yaw_pid.auto_mode:
-                yaw = clip(1500 - round(self.yaw_pid(theta)), 1000, 2000)
+                yaw = channel_value(self.yaw_ff - self.yaw_pid(theta))
             else:
-                yaw = 1500
+                yaw = channel_value(self.yaw_ff)
+            
+            # for logging w/ rosbags
             effort_msg = Float64MultiArray()
             effort_msg.data = [pitch, roll, yaw, throttle]
             self.effort_publisher.publish(effort_msg) 
@@ -249,6 +245,13 @@ class PIDController(Node):
             self.acc_publisher.publish(acc_msg)
             self.acc_target_publisher.publish(acc_target_msg)
             self.tx.update(pitch=pitch, roll=roll, yaw=yaw, throttle=throttle)
+        else:
+            self.throttle_pid.set_auto_mode(False)
+            self.pitch_pid.set_auto_mode(False)
+            self.roll_pid.set_auto_mode(False)
+            self.yaw_pid.set_auto_mode(False)
+
+        # preserving last state
         self.prev_theta = theta
         self.prev_unfiltered_theta = raw_theta
         self.prev_t = t
@@ -268,16 +271,20 @@ def main(args=None):
     parser.add_argument('--mode', type=Mode.from_string, choices=list(Mode), required=True,
                         help='Choose the tx type: sim for gazebo simulation, ppm for a microcontroller interface(e.g. arduino) or elrs for direct serial control of an elrs module')
     parsed_args = parser.parse_args(user_args) 
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
     rclpy.init(args=args, signal_handler_options=rclpy.signals.SignalHandlerOptions.NO)
     controller = None
     try:
         controller = PIDController(parsed_args.mode)
         while rclpy.ok():
             rclpy.spin_once(controller, timeout_sec=0.01)
-    except KeyboardInterrupt:
-        controller.get_logger().fatal('Emergency stop')
+    except (KeyboardInterrupt, SystemExit):
         if controller is not None:
+            controller.get_logger().fatal('Emergency stop!')
             controller.exit_gracefully()
+        else:
+            print('Emergency stop!')
     finally:
         if controller is not None:
             controller.destroy_node()

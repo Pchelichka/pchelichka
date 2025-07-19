@@ -19,7 +19,7 @@ RUN groupadd --gid $USER_GID $USERNAME \
 
 # Install dependencies for building OpenCV + GStreamer
 RUN sudo apt-get update && sudo apt-get install -y \
-    build-essential cmake git pkg-config \
+    build-essential cmake git pkg-config ros-jazzy-plotjuggler-ros \
     libgtk-3-dev libavcodec-dev libavformat-dev libswscale-dev \
     libv4l-dev libxvidcore-dev libx264-dev \
     libjpeg-dev libpng-dev libtiff-dev \

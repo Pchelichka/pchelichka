@@ -18,9 +18,9 @@ CHESSBOARD_CORNERS_COLCOUNT = 6
 # Note that the Z value for all stays at 0, as this is a printed out 2D image
 # And also that the max point is -1 of the max because we're zero-indexing
 # The following line generates all the tuples needed at (0, 0, 0)
-objp = np.zeros((CHESSBOARD_CORNERS_ROWCOUNT*CHESSBOARD_CORNERS_COLCOUNT,3), np.float32)
+objp = np.zeros((1, CHESSBOARD_CORNERS_ROWCOUNT*CHESSBOARD_CORNERS_COLCOUNT,3), np.float32)
 # The following line fills the tuples just generated with their values (0, 0, 0), (1, 0, 0), ...
-objp[:,:2] = np.mgrid[0:CHESSBOARD_CORNERS_ROWCOUNT,0:CHESSBOARD_CORNERS_COLCOUNT].T.reshape(-1, 2)
+objp[0,:,:2] = np.mgrid[0:CHESSBOARD_CORNERS_ROWCOUNT,0:CHESSBOARD_CORNERS_COLCOUNT].T.reshape(-1, 2)
 
 # vid = cv2.VideoCapture(4) 
 # vid = cv2.VideoCapture('fdsrc ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
@@ -36,7 +36,7 @@ while True:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Find the chess board corners
-    ret, corners = cv2.findChessboardCorners(gray, (CHESSBOARD_CORNERS_ROWCOUNT,CHESSBOARD_CORNERS_COLCOUNT), None)
+    ret, corners = cv2.findChessboardCorners(gray, (CHESSBOARD_CORNERS_ROWCOUNT,CHESSBOARD_CORNERS_COLCOUNT), cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
 
     # If found, add object points, image points (after refining them)
     if ret == True:        
@@ -52,7 +52,7 @@ while True:
                 criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)) # Last parameter is about termination critera
         imgpoints.append(corners_acc)
 
-        # If our image size is unknown, set it now
+        # wf our image size is unknown, set it now
         if not imageSize:
             imageSize = gray.shape[::-1]
     
@@ -61,7 +61,7 @@ while True:
         img = cv2.drawChessboardCorners(img, (CHESSBOARD_CORNERS_ROWCOUNT, CHESSBOARD_CORNERS_COLCOUNT), corners_acc, ret)
     cv2.imshow('Chessboard', img)
     cv2.waitKey(500)
-    if time.time() - start_time > 30:
+    if time.time() - start_time > 60:
         break
 
 # Destroy any open CV windows
@@ -78,12 +78,20 @@ if not imageSize:
 
 # Now that we've seen all of our images, perform the camera calibration
 # based on the set of points we've discovered
-calibration, cameraMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(
+cameraMatrix = np.zeros((3, 3))
+distCoeffs = np.zeros((4, 1))
+rvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(len(imgpoints))]
+tvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(len(imgpoints))]
+calibration, _, _, _, _ = cv2.fisheye.calibrate(
         objectPoints=objpoints,
         imagePoints=imgpoints,
-        imageSize=imageSize,
-        cameraMatrix=None,
-        distCoeffs=None)
+        image_size=imageSize,
+        K=cameraMatrix,
+        D=distCoeffs,
+		rvecs=rvecs,
+		tvecs=tvecs,
+        flags=cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW,
+        criteria=(cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6))
     
 # Print matrix and distortion coefficient to the console
 print(cameraMatrix)

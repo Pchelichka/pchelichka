@@ -48,6 +48,9 @@ class Camera(Node):
     self.aruco_params = cv2.aruco.DetectorParameters()
     self.publisher = self.create_publisher(Float64MultiArray, 'target', 10) 
     self.timer = self.create_timer(1 / 30, self.callback)
+    with np.load(os.path.join(get_package_share_directory('perception'), 'calibration.npz' if args.mode == 'analog' else 'calibration_dji.npz')) as cf:
+        self.mtx, self.dist = cf['mtx'], cf['dist']
+    self.get_logger().info(f'{self.mtx} {self.dist}')
     if args.mode == 'analog':
         self.vid = cv2.VideoCapture(4) 
         self.WIDTH = 640
@@ -76,12 +79,11 @@ class Camera(Node):
         [self.aruco_side_length / 2, -self.aruco_side_length / 2, 0],
         [-self.aruco_side_length / 2, -self.aruco_side_length / 2, 0]
     ]
-    self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
-    with np.load(os.path.join(get_package_share_directory('perception'), 'calibration.npz' if args.mode == 'analog' else 'calibration_dji.npz')) as cf:
-        self.mtx, self.dist = cf['mtx'], cf['dist']
-    print(self.mtx, self.dist) 
+    self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params) 
   def callback(self):
     ret, current_frame = self.vid.read() 
+    Knew = self.mtx.copy()
+    current_frame = cv2.fisheye.undistortImage(current_frame, self.mtx, self.dist, Knew=Knew)
     if not ret:
        return
     corners, _, _ = self.aruco_detector.detectMarkers(current_frame)
@@ -97,14 +99,15 @@ class Camera(Node):
             # self.publisher.publish(msg)
             # current_frame = cv2.circle(current_frame, c, 5, (255, 0, 0), 2) 
         # ret, rvecs, tvecs = cv2.solvePnP(self.marker_points, corners, self.mtx, self.dist)
-        rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[0], self.aruco_side_length, self.mtx,
-                                                                       self.dist)
+        rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[0], self.aruco_side_length, Knew,
+                                                                       np.zeros((4, 1)))
 
         # Draw Axis
         cv2.drawFrameAxes(current_frame, self.mtx, self.dist, rvec, tvec, 0.1)  
         R, _ = cv2.Rodrigues(rvec)
         x, y, z = tvec[0][0]
         theta = rotationMatrixToEulerAngles(R)[1]
+        self.get_logger().info(f'x: {x} y: {y} z: {z}')
         msg = Float64MultiArray()
         msg.data = [x * 100, y * 100, z * 100, theta, time.time()]
         # print(cv2.rot2euler(rvec))
