@@ -271,13 +271,12 @@ class PID(object):
         self._last_error = None
 
 class CascadePID():
-    def __init__(self, level = 1, setpoint = 0, *args):
+    def __init__(self, level = 1, setpoint = 0, constants = []):
         self.pids = []
         self.level = level
         self._auto_mode = True
         self.setpoint = setpoint
-        self.parameters = zip(*([iter(args)] * 3))
-        for p in self.parameters:
+        for p in constants:
             self.pids.append(PID(p[0], p[1], p[2]))
     def __call__(self, *args):
         outputs = [self.setpoint]
