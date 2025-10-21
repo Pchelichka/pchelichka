@@ -24,7 +24,8 @@ objp[:,:2] = np.mgrid[0:CHESSBOARD_CORNERS_ROWCOUNT,0:CHESSBOARD_CORNERS_COLCOUN
 
 # vid = cv2.VideoCapture(4) 
 # vid = cv2.VideoCapture('fdsrc ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
-vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! decodebin ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
+# vid = cv2.VideoCapture('filesrc location=/tmp/video_pipe ! decodebin ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
+vid = cv2.VideoCapture('udpsrc port=5600 ! application/x-rtp ! rtph265depay ! h265parse ! decodebin ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
 imageSize = None
 time.sleep(2)
 start_time = time.time()

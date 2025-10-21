@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml', 'resource/' + 'calibration.npz']),
         ('share/' + package_name, ['package.xml', 'resource/' + 'calibration_dji.npz']),
+        ('share/' + package_name, ['package.xml', 'resource/' + 'calibration_openipc.npz']),
 		(os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
 		(os.path.join('share', package_name, 'scripts'), glob('scripts/*')),
     ],

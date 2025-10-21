@@ -13,7 +13,7 @@ def generate_launch_description():
     camera_node = Node(
         package='perception',
         executable='camera',
-		arguments=['--mode', 'digital']
+		arguments=['--mode', 'dji']
     )
 
     launch_camera_node = RegisterEventHandler(

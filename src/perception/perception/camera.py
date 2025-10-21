@@ -48,14 +48,14 @@ class Camera(Node):
     self.aruco_params = cv2.aruco.DetectorParameters()
     self.publisher = self.create_publisher(Float64MultiArray, 'target', 10) 
     self.timer = self.create_timer(1 / 30, self.callback)
-    with np.load(os.path.join(get_package_share_directory('perception'), 'calibration.npz' if args.mode == 'analog' else 'calibration_dji.npz')) as cf:
+    with np.load(os.path.join(get_package_share_directory('perception'), 'calibration.npz' if args.mode == 'analog' else ('calibration_dji.npz' if args.mode == 'dji' else 'calibration_openipc.npz'))) as cf:
         self.mtx, self.dist = cf['mtx'], cf['dist']
     self.get_logger().info(f'{self.mtx} {self.dist}')
     if args.mode == 'analog':
         self.vid = cv2.VideoCapture(4) 
         self.WIDTH = 640
         self.HEIGHT = 480
-    elif args.mode == 'digital':
+    elif args.mode == 'dji':
         # stdin instead of named pipe
         # self.vid = cv2.VideoCapture('fdsrc ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
         # test h264 pipeline
@@ -70,6 +70,11 @@ class Camera(Node):
 
         self.vid.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.WIDTH = 960
+        self.HEIGHT = 720
+    elif args.mode == 'openipc':
+        self.vid = cv2.VideoCapture('udpsrc port=5600 ! application/x-rtp ! rtph265depay ! h265parse ! decodebin ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false', cv2.CAP_GSTREAMER) 
+        self.vid.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.WIDTH = 1280
         self.HEIGHT = 720
 
     self.aruco_side_length = 0.1 # meters
@@ -125,8 +130,8 @@ def main(args=None):
   else:
     user_args = sys.argv[1:]
   parser = argparse.ArgumentParser()
-  parser.add_argument('--mode', choices=['analog', 'digital'], required=True,
-                        help='Choose the input type: analog (OpenCV webcam) or digital (custom C++ stream)')
+  parser.add_argument('--mode', choices=['analog', 'dji', 'openipc'], required=True,
+                        help='Choose the input type: analog (OpenCV webcam), dji (custom C++ stream) or OpenIPC(apfpv firmware)')
   parsed_args = parser.parse_args(user_args) 
   # Initialize the rclpy library
   rclpy.init(args=args)
