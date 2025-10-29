@@ -52,24 +52,38 @@ bool ELRSNode::ParseCrsfPacket(uint8_t* buffer, size_t buffer_length) {
 				int8_t rssi2 = payload[1] >= 128 ? payload[1] - 256 : payload[1];
 				uint8_t lq = payload[2];
 				uint8_t mode = payload[5];
-				RCLCPP_INFO(NODE_LOGGER, "Telemetry: RSSI=%d/%d LQ=%d:%d", rssi1, rssi2, mode, lq);
+				// RCLCPP_INFO(NODE_LOGGER, "Telemetry: RSSI=%d/%d LQ=%d:%d", rssi1, rssi2, mode, lq);
 				break;
 			}
 			case CRSF_PACKET_TYPE_ATTITUDE:
+			{
 				drone_connected_ = true;
 				current_pitch_ = ((int16_t)((payload[0] << 8) | payload[1])) / 10000.0f;
 				current_roll_  = ((int16_t)((payload[2] << 8) | payload[3])) / 10000.0f;
 				current_yaw_   = ((int16_t)((payload[4] << 8) | payload[5])) / 10000.0f;
 
-        		RCLCPP_INFO(NODE_LOGGER, "Attitude: Roll=%.2f rad, Pitch=%.2f rad, Yaw=%.2f rad", current_roll_, current_pitch_, current_yaw_);
+        		// RCLCPP_INFO(NODE_LOGGER, "Attitude: Roll=%.2f rad, Pitch=%.2f rad, Yaw=%.2f rad", current_roll_, current_pitch_, current_yaw_);
 				break;
+			}
+			case CRSF_PACKET_TYPE_BATTERY_SENSOR:
+			{
+				drone_connected_ = true;
+				float battery_voltage = static_cast<uint16_t>((payload[0] << 8) | payload[1]) / 10.0f;
+				float current = static_cast<uint16_t>((payload[2] << 8) | payload[3]) / 10.0f;
+				uint32_t mah = (payload[4] << 16) | (payload[5] << 8) | payload[6];
+				uint8_t pct = payload[7];
+
+				RCLCPP_INFO(NODE_LOGGER, "Battery: %.2fV %.1fA %umAh %u%%",
+							battery_voltage, current, mah, pct);
+				break;
+			}
 			default:
-				RCLCPP_INFO(NODE_LOGGER, "Received packet type 0x%02X", type);
+				// RCLCPP_INFO(NODE_LOGGER, "Received packet type 0x%02X", type);
 				break;
 		}
 		return true;
 	} else {
-		RCLCPP_WARN(NODE_LOGGER, "CRC error, packet type: 0x%02X", type);
+		// RCLCPP_WARN(NODE_LOGGER, "CRC error, packet type: 0x%02X", type);
 		return false;
 	}
 }

@@ -1,7 +1,7 @@
 import requests
 from enum import Enum, auto
 from typing import List
-from .commands import Position, Command, Arm, Disarm, Delay, PTP, Sequence
+from .commands import Position, Command, Arm, Disarm, Delay, Takeoff, PTP, Sequence
 
 class ConfigType(Enum):
    CODE = auto()
@@ -12,6 +12,13 @@ TAKEOFF_DELAY_SECS = 3
 class Config:
     def __init__(self, type = ConfigType.CODE):
         if type == ConfigType.CODE:
+            self.manual = {
+                "roll": True,
+                "pitch": True,
+                "yaw": True,
+                "throttle": True,
+                "mode": True
+            }
             self.roll_ff = 1500
             self.roll_pid_constants = [[1, 0, 0],   # pos
                                    [1.5, 1.2, 0], # vel 
@@ -20,19 +27,19 @@ class Config:
             self.pitch_pid_constants = [[1, 0, 0],   # pos 
                                     [1.5, 1.2, 0], # vel
                                     [25, 0, 0]]
+            self.throttle_manual = False
             self.throttle_ff = 1580
             self.throttle_pid_constants = [[1.5, 0.2, 0],  # pos
                                        [4, 0, 0], # vel 
                                        [14, 28, 0]]
             self.yaw_ff = 1500
             self.yaw_pid_constants = [[40, 0, 2]]
-            self.sequence = Sequence([Arm(), Delay(TAKEOFF_DELAY_SECS), PTP(Position(0, 0, 1, 0), 0.15),  Delay(3), PTP(Position(0, -0.4, 1, 0)), Disarm()])
+            self.sequence = Sequence([Arm(), Delay(TAKEOFF_DELAY_SECS), Takeoff(), PTP(Position(0, 0, 1, 0), 0.15)])
         elif type == ConfigType.SERVER:
             raw_data = requests.get(r'http://localhost:8000/config').json()
             for k, v in raw_data.items():
                 setattr(self, k, v)
             self.sequence = Config.parse_code(self.code)
-            print(self)
         else:
             raise ValueError("Invalid config type!")
 
@@ -74,6 +81,8 @@ class Config:
                 commands.append(Arm())
             elif cmd == 'disarm':
                 commands.append(Disarm())
+            elif cmd == 'takeoff':
+                commands.append(Takeoff())
             elif cmd == 'dly':
                 if len(parts) != 2:
                     raise ValueError(f"Invalid Delay syntax: {line}")

@@ -67,7 +67,6 @@ class Tx:
         self.channels[3] = 988
         self.channels[4] = 1500
         self.channels[5] = 1999
-        self.channels[6] = 988
         self.send()
 
     def land(self):
@@ -79,11 +78,13 @@ class Tx:
         self.channels[3] = throttle
         self.send()
 
-    def update(self, pitch: int = 1500, roll: int = 1500, yaw: int = 1500, throttle: int = 1500):
+    def update(self, pitch: int = 1500, roll: int = 1500, yaw: int = 1500, throttle: int = 1500, mode: int = 1000):
         self.channels[1] = roll
         self.channels[2] = pitch
         self.channels[3] = throttle
         self.channels[4] = yaw
+        # TODO: check mode channel number
+        self.channels[6] = mode
         self.send()
 
     def disarm(self):

@@ -2,15 +2,15 @@ from collections import deque
 import numpy as np
 from scipy.signal import savgol_coeffs
 
-coeff0 = savgol_coeffs(13, 3, deriv=0, pos=6, use ='dot')
-coeff1 = savgol_coeffs(13, 3, deriv=1, pos=6, use ='dot')
-coeff2 = savgol_coeffs(13, 3, deriv=2, pos=6, use ='dot')
+WINDOW_LENGTH = 13
+coeff0 = savgol_coeffs(WINDOW_LENGTH, 3, deriv=0, pos=6, use ='dot')
+coeff1 = savgol_coeffs(WINDOW_LENGTH, 3, deriv=1, pos=6, use ='dot')
+coeff2 = savgol_coeffs(WINDOW_LENGTH, 3, deriv=2, pos=6, use ='dot')
 
 class SavgolFilteredData:
-	def __init__(self, sample_time=1):
-		self.sample_time = sample_time
+	def __init__(self):
 		self.window = deque([])
-		self.window_length = 13
+		self.window_length = WINDOW_LENGTH
 		self.value = None
 		self.first_derivative_value = None
 		self.second_derivative_value = None
@@ -25,7 +25,7 @@ class SavgolFilteredData:
 		self.coeff2 = coeff2
 		self.filtering = False
 
-	def add(self, value: int):
+	def add(self, value: int, sample_time: float=1):
 		self.window.append(value)
 		self.value = value
 		while len(self.window) > self.window_length:
@@ -39,5 +39,5 @@ class SavgolFilteredData:
 				self.value += x * self.coeff0[i]
 				self.first_derivative_value += x * self.coeff1[i]
 				self.second_derivative_value += x * self.coeff2[i]
-			self.first_derivative_value /= self.sample_time	
-			self.second_derivative_value /= self.sample_time * self.sample_time
+			self.first_derivative_value /= sample_time	
+			self.second_derivative_value /= sample_time * sample_time

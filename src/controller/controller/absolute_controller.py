@@ -2,6 +2,7 @@ import sys
 import rclpy
 from rclpy.node import Node
 import time
+from .util import channel_value, sig_handler
 from .tx import Tx, Mode
 from .pid import PID, CascadePID
 from .configuration import Config, ConfigType
@@ -13,16 +14,9 @@ import argparse
 import signal
 from telemetry_interfaces.srv import GetAttitude, GetPitch, GetRoll, GetYaw, GetBatteryVoltage
 
-def sig_handler(_signo, _stack_frame_):
-    sys.exit(0)
-
-def clip(value: int, lower: int, upper: int):
-    return lower if value < lower else upper if value > upper else value
-
-def channel_value(value: float):
-    return clip(round(value), 1000, 2000)
-
-CONTROL_THROTTLE = 1550
+CONTROL_THROTTLE = 1500
+VISION_FPS = 90
+UPDATE_RATE = VISION_FPS
 
 class PIDController(Node):
 
@@ -30,6 +24,7 @@ class PIDController(Node):
         super().__init__('controller')
         self.tx_mode = tx_mode
         self._sequence_started = False
+        self._taking_off = False
         self.effort_publisher = self.create_publisher(Float64MultiArray, 'effort', 10) 
         self.velocity_publisher = self.create_publisher(Float64MultiArray, 'velocity', 10) 
         self.velocity_target_publisher = self.create_publisher(Float64MultiArray, 'velocity_target', 10) 
@@ -59,11 +54,12 @@ class PIDController(Node):
         self.theta = 0
         self.prev_theta = None
         self.prev_unfiltered_theta = None
-        self.prev_t = None
+        self.last_camera_recv_t = None
         self.battery_voltage = 0
-        self.x = SavgolFilteredData(1 / 30)
-        self.y = SavgolFilteredData(1 / 30)
-        self.z = SavgolFilteredData(1 / 30)
+        self.x = SavgolFilteredData()
+        self.y = SavgolFilteredData()
+        self.z = SavgolFilteredData()
+        self.theta = 0
         self.attitude_client = self.create_client(GetAttitude, '/get_attitude')
         self.pitch_client = self.create_client(GetPitch, '/get_pitch')
         self.roll_client = self.create_client(GetRoll, '/get_roll')
@@ -76,11 +72,19 @@ class PIDController(Node):
         while not self.battery_voltage_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Battery voltage service not available, waiting again...')
         self.timer_action = self.create_timer(0.01, self.call_telemetry_services)
+        self.control_timer = self.create_timer(1 / UPDATE_RATE, self.control)
         self.subscriber = self.create_subscription(
             Float64MultiArray,
             'target',
             self.listener_callback,
             10)
+        if any(self.config.manual.values()):
+            self.manual_rc_channels = []
+            self.joystick_subscriber = self.create_subscription(
+                Int32MultiArray,
+                'manual_rc_chan',
+                self.joystick_listener_callback,
+                10)
         self.tx = Tx(mode=self.tx_mode, publisher=self.create_publisher(Int32MultiArray, 'rc_channels', 10) if self.tx_mode == Mode.ELRS else None)
         # Wait for tx initialization
         time.sleep(1)
@@ -98,6 +102,7 @@ class PIDController(Node):
         self._sequence_started = value
         if value:
             self.sequence_started_time = time.time()
+            self.get_logger().info(f'Command squence started at {time.strftime("%Y-%m-%d %H:%M:%S GMT", time.gmtime(self.sequence_started_time))}')
 
     def call_telemetry_services(self):
         if self.battery_voltage_client.service_is_ready():
@@ -134,7 +139,7 @@ class PIDController(Node):
             self.roll = future.result().roll_radians
             self.yaw = future.result().yaw_radians
             # start programmed sequence as soon as service indicates readiness
-            if not self.sequence_started:
+            if not self.sequence_started and self.last_camera_recv_t:
                 self.sequence_started = True
     
     
@@ -143,37 +148,41 @@ class PIDController(Node):
             self.battery_voltage = future.result().voltage
     
     def arm(self) -> None:
+        self.get_logger().info('Arming...')
         self.tx.arm()
 
     def disarm(self) -> None:
         self.tx.disarm()
+
+    def enable_auto(self) -> None:
+        self.yaw_pid.set_auto_mode(True)
+        self.throttle_pid.set_auto_mode(True)
+        self.roll_pid.set_auto_mode(True)
+        self.pitch_pid.set_auto_mode(True)
+        
 
     def set_setpoint(self, new_setpoint: Position) -> None:
         self.roll_pid.setpoint = new_setpoint.x 
         self.throttle_pid.setpoint = new_setpoint.y 
         self.pitch_pid.setpoint = new_setpoint.z 
         self.yaw_pid.setpoint = new_setpoint.theta
-        self.yaw_pid.set_auto_mode(True)
-        self.throttle_pid.set_auto_mode(True)
-        self.roll_pid.set_auto_mode(True)
-        self.pitch_pid.set_auto_mode(True)
 
     def get_current_position(self) -> Position: 
         return Position(self.x.value, self.y.value, self.z.value, self.theta)
 
-    def listener_callback(self, msg: Float64MultiArray):
-        raw_x, raw_y, raw_z, raw_theta, t = msg.data
-        # scale to meters and add to filters
-        raw_x /= 100
-        self.x.add(raw_x)
-        raw_y /= 100
-        self.y.add(raw_y)
-        raw_z /= 100
-        self.z.add(raw_z)
-        theta = raw_theta
-        if self.prev_t:
-            # low-pass filtering
-            theta = -0.35367012 * self.prev_theta + 0.67683506 * raw_theta + 0.67683506 * self.prev_unfiltered_theta
+    def start_takeoff(self) -> None: 
+        self._taking_off = True
+    def end_takeoff(self) -> None: 
+        self._taking_off = False
+        self.enable_auto()
+    def control(self):
+        # default values(permit arming)
+        pitch = 1500
+        roll = 1500
+        throttle = 988
+        yaw = 1500
+        mode = 988
+
         if self.sequence_started:
             self.sequence.update(self)
 
@@ -219,7 +228,7 @@ class PIDController(Node):
 
             # inverse yaw
             if self.yaw_pid.auto_mode:
-                yaw = channel_value(self.yaw_ff - self.yaw_pid(theta))
+                yaw = channel_value(self.yaw_ff - self.yaw_pid(self.theta))
             else:
                 yaw = channel_value(self.yaw_ff)
             
@@ -231,13 +240,46 @@ class PIDController(Node):
             self.velocity_target_publisher.publish(velocity_target_msg)
             self.acc_publisher.publish(acc_msg)
             self.acc_target_publisher.publish(acc_target_msg)
-        if self.pitch_pid.auto_mode or self.roll_pid.auto_mode or self.throttle_pid.auto_mode or self.yaw_pid.auto_mode:
-            self.tx.update(pitch=pitch, roll=roll, yaw=yaw, throttle=throttle)
+        # manual control enabled
+        if self.manual_rc_channels:
+            if self.config.manual['roll']:
+                roll = self.manual_rc_channels[0]
+            if self.config.manual['pitch']:
+                pitch = self.manual_rc_channels[1]
+            if self.config.manual['throttle']:
+                throttle = self.manual_rc_channels[2]
+            if self.config.manual['yaw']:
+                yaw = self.manual_rc_channels[3]
+            if self.config.manual['mode']:
+                mode = self.manual_rc_channels[5]
+        if self._taking_off:
+            throttle = self.config.throttle_ff
+        if self.pitch_pid.auto_mode or self.roll_pid.auto_mode or self.throttle_pid.auto_mode or self.yaw_pid.auto_mode or (self.manual_rc_channels and self.config.manual['throttle']):
+            self.tx.update(pitch=pitch, roll=roll, yaw=yaw, throttle=throttle, mode=mode)
 
+    def joystick_listener_callback(self, msg: Int32MultiArray):
+        self.manual_rc_channels = msg.data
+
+    def listener_callback(self, msg: Float64MultiArray):
+        raw_x, raw_y, raw_z, raw_theta, t = msg.data
+        self.theta = raw_theta
+        # scale to meters
+        raw_x /= 100
+        raw_y /= 100
+        raw_z /= 100
+        if self.last_camera_recv_t:
+            sample_time = (time.time() - self.last_camera_recv_t)
+            self.get_logger().debug(f'RECV FPS: {1 / sample_time}')
+            self.x.add(raw_x, sample_time)
+            self.y.add(raw_y, sample_time)
+            self.z.add(raw_z, sample_time)
+            # low-pass filtering
+            self.theta = -0.35367012 * self.prev_theta + 0.67683506 * raw_theta + 0.67683506 * self.prev_unfiltered_theta 
+        self.get_logger().info(f'x: {self.x.value}, y: {self.y.value}, z: {self.z.value}, theta: {self.theta}')
         # preserving last state
-        self.prev_theta = theta
+        self.prev_theta = self.theta
         self.prev_unfiltered_theta = raw_theta
-        self.prev_t = t
+        self.last_camera_recv_t = t
 
     def exit_gracefully(self):
         self.get_logger().info('Exiting...')

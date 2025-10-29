@@ -103,13 +103,13 @@ def main():
 			rvecs=rvecs,
 			tvecs=tvecs,
 			flags=cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW,
-			criteria=(cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6))
+			criteria=(cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-5))
 		
 	# Print matrix and distortion coefficient to the console
 	print(cameraMatrix)
 	print(distCoeffs)
 	# np.savez(os.path.join(os.path.dirname(__file__), '../resource/calibration.npz'), mtx=cameraMatrix, dist=distCoeffs)
-	np.savez(os.path.join(os.path.dirname(__file__), '../resource/calibration_dji.npz'), mtx=cameraMatrix, dist=distCoeffs)
+	np.savez(os.path.join(os.path.dirname(__file__), 'calibration_openipc.npz'), mtx=cameraMatrix, dist=distCoeffs)
 
 if __name__ == '__main__':
 	main()

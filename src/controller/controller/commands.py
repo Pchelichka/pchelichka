@@ -34,7 +34,7 @@ class Command(ABC):
 
 class Arm(Command):
     def start(self, controller: ControllerInterface) -> None:
-        controller.get_logger().info('Arming')
+        controller.get_logger().info('Executing arm command.')
         controller.arm()
 
     def update(self, _controller: ControllerInterface) -> bool:
@@ -42,7 +42,7 @@ class Arm(Command):
 
 class Disarm(Command):
     def start(self, controller: ControllerInterface) -> None:
-        controller.get_logger().info('Disarming')
+        controller.get_logger().info('Executing disarm command.')
         controller.disarm()
 
     def update(self, _controller: ControllerInterface) -> bool:
@@ -62,6 +62,21 @@ class Delay(Command):
             return True # Completed only after delay has elapsed
         return False
 
+class Takeoff(Command):
+    def __init__(self, delay_secs: float = 0.5) -> None:
+        self.delay = delay_secs
+
+    def start(self, controller: ControllerInterface) -> None:
+        controller.get_logger().info(f'Taking off for {self.delay}')
+        controller.start_takeoff()
+        self.start_time = time.time()
+
+    def update(self, controller: ControllerInterface) -> bool:
+        if time.time() - self.start_time > self.delay:
+            controller.get_logger().info(f'Takeoff took {self.delay} seconds')
+            controller.end_takeoff()
+            return True # Completed only after delay has elapsed
+        return False
 
 
 class PTP(Command):
@@ -75,7 +90,7 @@ class PTP(Command):
 
     def update(self, controller: ControllerInterface) -> bool:
         current_position = controller.get_current_position()
-        error: List[float] = [abs(c - t) for c, t in zip(current_position.as_array(), self.target_position.as_array())]
+        error: List[float] = [(abs(c - t) if c is not None else float('inf')) for c, t in zip(current_position.as_array(), self.target_position.as_array())]
         if all(e <= self.tolerance for e in error):
             controller.get_logger().info(f'Reached {self.target_position.as_array()} with error {error}')
             return True
